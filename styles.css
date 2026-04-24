@@ -411,6 +411,97 @@ th:last-child {
   color: var(--ice-700);
 }
 
+.leaderboard-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.leaderboard-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.6rem;
+  align-items: center;
+  border: 1px solid rgba(20, 93, 116, 0.2);
+  border-radius: 12px;
+  background: #ffffff;
+  padding: 0.55rem 0.7rem;
+}
+
+.leaderboard-rank {
+  font-family: "IBM Plex Mono", monospace;
+  color: var(--ice-700);
+}
+
+.leaderboard-xp {
+  font-family: "IBM Plex Mono", monospace;
+  font-weight: 600;
+}
+
+.leaderboard-meta {
+  font-size: 0.82rem;
+  color: rgba(18, 38, 49, 0.68);
+}
+
+.xp-config-list {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.xp-config-row {
+  display: grid;
+  grid-template-columns: 1fr 92px;
+  gap: 0.6rem;
+  align-items: center;
+  border: 1px solid rgba(20, 93, 116, 0.18);
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 0.45rem 0.55rem;
+}
+
+.xp-config-row span {
+  font-size: 0.86rem;
+}
+
+.schedule-meta {
+  margin-right: auto;
+}
+
+.schedule-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.celebration-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(18, 38, 49, 0.48);
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  z-index: 100;
+}
+
+.celebration-modal__card {
+  width: min(520px, 100%);
+  border-radius: 18px;
+  padding: 1.1rem;
+  background: linear-gradient(150deg, #ffffff 0%, #f4fbff 50%, #fff4e0 100%);
+  border: 1px solid rgba(20, 93, 116, 0.2);
+  box-shadow: 0 14px 40px rgba(17, 54, 76, 0.2);
+  animation: rise 180ms ease-out both;
+}
+
+.celebration-modal__card h3 {
+  margin: 0.25rem 0 0.45rem;
+}
+
+.celebration-modal__card p {
+  margin: 0;
+}
+
 /* ── Unavailability form ─────────────────────────────────────────── */
 
 .due-badge {

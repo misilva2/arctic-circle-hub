@@ -152,6 +152,64 @@
 
       <section class="panel panel--wide">
         <div class="panel__head">
+          <h2>XP Leaderboard</h2>
+        </div>
+        <p class="panel-note">
+          Clocking in during 10:00 earns 50 XP. Task completions earn XP by task value.
+        </p>
+        <ol id="leaderboardList" class="leaderboard-list"></ol>
+        <h3 class="admin-subhead">Weekly Winners Archive</h3>
+        <ul id="weeklyWinnersList" class="chip-list"></ul>
+        <div id="adminXpConfig" hidden>
+          <form id="xpConfigForm" class="form-grid admin-time-entry">
+            <h3 class="admin-subhead">XP Configuration</h3>
+            <div id="xpConfigList" class="xp-config-list"></div>
+            <div class="button-row align-end">
+              <button type="submit">Save XP Values</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section class="panel panel--wide">
+        <div class="panel__head">
+          <h2>Team Schedule</h2>
+        </div>
+        <div id="adminScheduleForm" hidden>
+          <form id="scheduleForm" class="form-grid admin-time-entry">
+            <h3 class="admin-subhead">Add Schedule Shift</h3>
+            <div class="time-entry-row">
+              <label>
+                Employee
+                <select id="scheduleEmployee" required></select>
+              </label>
+              <label>
+                Date
+                <input type="date" id="scheduleDate" required />
+              </label>
+              <label>
+                Start
+                <input type="time" id="scheduleStart" required />
+              </label>
+              <label>
+                End
+                <input type="time" id="scheduleEnd" required />
+              </label>
+              <label>
+                Notes <span class="optional">(optional)</span>
+                <input type="text" id="scheduleNotes" maxlength="100" placeholder="station or coverage notes" />
+              </label>
+              <div class="button-row align-end">
+                <button type="submit">Add Shift</button>
+              </div>
+            </div>
+          </form>
+        </div>
+        <ul id="scheduleList" class="chip-list"></ul>
+      </section>
+
+      <section class="panel panel--wide">
+        <div class="panel__head">
           <h2>Monthly Unavailability</h2>
           <span id="unavailDueBadge" class="due-badge"></span>
         </div>
@@ -212,6 +270,17 @@
         <button type="button" class="text-btn">Remove</button>
       </li>
     </template>
+
+    <div id="celebrationModal" class="celebration-modal" hidden>
+      <div class="celebration-modal__card" role="dialog" aria-modal="true" aria-labelledby="celebrationTitle">
+        <p class="eyebrow">Weekly Winner</p>
+        <h3 id="celebrationTitle">Celebration</h3>
+        <p id="celebrationMessage"></p>
+        <div class="button-row">
+          <button type="button" id="closeCelebrationBtn">Awesome</button>
+        </div>
+      </div>
+    </div>
 
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js" defer></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js" defer></script>

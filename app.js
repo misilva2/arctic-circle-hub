@@ -57,6 +57,18 @@ const ROLE_TASKS = {
   Service: [...SERVICE_TASKS, INVENTORY_REMINDER]
 };
 
+const ON_TIME_XP = 50;
+const TASK_XP_DEFAULT = 20;
+const DEFAULT_TASK_XP_BY_TEXT = {
+  "Close: Clean grill": 35,
+  "Close: Take inventory": 45,
+  "Help prep with closing tasks": 25,
+  "Morning and Close: Wipe down all surfaces": 20,
+  "Morning and Close: Sweep and mop front": 30,
+  "Morning and Close: Restock": 30,
+  "Reminder: Notify the manager when inventory is low.": 10
+};
+
 const defaultState = createDefaultState();
 
 const session = {
@@ -96,7 +108,23 @@ const refs = {
   unavailNotes: document.getElementById("unavailNotes"),
   unavailSubmitBtn: document.getElementById("unavailSubmitBtn"),
   unavailStatus: document.getElementById("unavailStatus"),
-  unavailDueBadge: document.getElementById("unavailDueBadge")
+  unavailDueBadge: document.getElementById("unavailDueBadge"),
+  leaderboardList: document.getElementById("leaderboardList"),
+  adminScheduleForm: document.getElementById("adminScheduleForm"),
+  scheduleForm: document.getElementById("scheduleForm"),
+  scheduleEmployee: document.getElementById("scheduleEmployee"),
+  scheduleDate: document.getElementById("scheduleDate"),
+  scheduleStart: document.getElementById("scheduleStart"),
+  scheduleEnd: document.getElementById("scheduleEnd"),
+  scheduleNotes: document.getElementById("scheduleNotes"),
+  scheduleList: document.getElementById("scheduleList"),
+  adminXpConfig: document.getElementById("adminXpConfig"),
+  xpConfigForm: document.getElementById("xpConfigForm"),
+  xpConfigList: document.getElementById("xpConfigList"),
+  weeklyWinnersList: document.getElementById("weeklyWinnersList"),
+  celebrationModal: document.getElementById("celebrationModal"),
+  celebrationMessage: document.getElementById("celebrationMessage"),
+  closeCelebrationBtn: document.getElementById("closeCelebrationBtn")
 };
 
 const syncStatusEl = document.getElementById("syncStatus");
@@ -110,6 +138,9 @@ function bindEvents() {
   refs.clockOutBtn.addEventListener("click", clockOut);
   refs.exportCsvBtn.addEventListener("click", exportCsv);
   refs.addTimeForm.addEventListener("submit", addManualEntry);
+  refs.scheduleForm.addEventListener("submit", addScheduleEntry);
+  refs.xpConfigForm.addEventListener("submit", saveXpConfig);
+  refs.closeCelebrationBtn.addEventListener("click", closeCelebration);
   refs.adminSignInBtn.addEventListener("click", signInAdmin);
   refs.unavailForm.addEventListener("submit", submitUnavailability);
   refs.adminSignOutBtn.addEventListener("click", signOutAdmin);
@@ -124,15 +155,13 @@ function signInAdmin() {
 
   session.isAdminSignedIn = true;
   refs.adminPasscode.value = "";
-  renderTaskAccess();
-  renderProcedures();
+  renderAll();
 }
 
 function signOutAdmin() {
   session.isAdminSignedIn = false;
   refs.adminPasscode.value = "";
-  renderTaskAccess();
-  renderProcedures();
+  renderAll();
 }
 
 function clockIn() {
@@ -160,12 +189,17 @@ function clockIn() {
     return;
   }
 
+  const now = new Date();
   state.entries.push({
     id: crypto.randomUUID(),
     employeeId,
-    clockIn: new Date().toISOString(),
+    clockIn: now.toISOString(),
     clockOut: null
   });
+
+  if (now.getHours() === 10) {
+    awardXp(employeeId, ON_TIME_XP, "On-time clock-in at 10:00", now.toISOString());
+  }
 
   refs.clockPin.value = "";
   persistAndRender();
@@ -197,7 +231,10 @@ function clockOut() {
     return;
   }
 
-  openEntry.clockOut = new Date().toISOString();
+  const now = new Date();
+  openEntry.clockOut = now.toISOString();
+
+  maybeAnnounceWeeklyWinner(employeeId, now);
   refs.clockPin.value = "";
   persistAndRender();
 }
@@ -213,7 +250,18 @@ function toggleProcedure(procedureId) {
     return;
   }
 
-  procedure.done = !procedure.done;
+  const nextDone = !procedure.done;
+  procedure.done = nextDone;
+
+  if (nextDone) {
+    procedure.completedAt = new Date().toISOString();
+    if (!procedure.xpAwarded) {
+      const xp = getTaskXp(procedure.text);
+      awardXp(procedure.employeeId, xp, `Task completed: ${procedure.text}`);
+      procedure.xpAwarded = true;
+    }
+  }
+
   persistAndRender();
 }
 
@@ -235,6 +283,9 @@ function renderAll() {
   renderEntries();
   renderProcedures();
   renderSummary();
+  renderLeaderboard();
+  renderSchedule();
+  renderXpConfig();
   updateLiveClockIns();
   renderTaskAccess();
   renderUnavailForm();
@@ -255,7 +306,7 @@ function renderEmployees() {
       adminBadge.className = "admin-badge";
       adminBadge.textContent = "Admin";
       li.append(adminBadge);
-    } else if (session.isAdminSignedIn) {
+    } else {
       // Role change
       const roleSelect = document.createElement("select");
       roleSelect.className = "role-select";
@@ -267,11 +318,13 @@ function renderEmployees() {
         roleSelect.append(option);
       }
       roleSelect.value = employee.role;
+      roleSelect.disabled = !session.isAdminSignedIn;
 
       const roleBtn = document.createElement("button");
       roleBtn.type = "button";
       roleBtn.className = "outline role-btn";
       roleBtn.textContent = "Change Role";
+      roleBtn.disabled = !session.isAdminSignedIn;
       roleBtn.addEventListener("click", () => {
         changeEmployeeRole(employee.id, roleSelect.value);
       });
@@ -283,11 +336,13 @@ function renderEmployees() {
       pinInput.maxLength = 10;
       pinInput.className = "pin-input";
       pinInput.setAttribute("aria-label", `PIN for ${employee.name}`);
+      pinInput.disabled = !session.isAdminSignedIn;
 
       const pinBtn = document.createElement("button");
       pinBtn.type = "button";
       pinBtn.className = "outline role-btn";
       pinBtn.textContent = "Change PIN";
+      pinBtn.disabled = !session.isAdminSignedIn;
       pinBtn.addEventListener("click", () => {
         changeEmployeePin(employee.id, pinInput.value);
       });
@@ -606,6 +661,321 @@ function renderSummary() {
   }
 }
 
+function renderLeaderboard() {
+  refs.leaderboardList.textContent = "";
+  refs.weeklyWinnersList.textContent = "";
+
+  const now = new Date();
+  const totals = state.employees
+    .map((employee) => ({
+      employee,
+      weeklyXp: getWeeklyXp(employee.id, now),
+      totalXp: getTotalXp(employee.id)
+    }))
+    .sort((a, b) => b.weeklyXp - a.weeklyXp || b.totalXp - a.totalXp || a.employee.name.localeCompare(b.employee.name));
+
+  if (totals.length === 0) {
+    const li = document.createElement("li");
+    li.textContent = "No leaderboard data yet.";
+    refs.leaderboardList.append(li);
+    const archiveLi = document.createElement("li");
+    archiveLi.textContent = "No archived winners yet.";
+    refs.weeklyWinnersList.append(archiveLi);
+    return;
+  }
+
+  for (const [index, item] of totals.entries()) {
+    const li = document.createElement("li");
+    li.className = "leaderboard-item";
+    li.innerHTML = `
+      <span class="leaderboard-rank">#${index + 1}</span>
+      <span>
+        ${item.employee.name}
+        <div class="leaderboard-meta">Weekly: ${item.weeklyXp} XP | Total: ${item.totalXp} XP</div>
+      </span>
+      <span class="leaderboard-xp">${item.weeklyXp} XP</span>
+    `;
+    refs.leaderboardList.append(li);
+  }
+
+  const winners = [...state.weeklyWinners].sort((a, b) => b.weekKey.localeCompare(a.weekKey));
+  if (winners.length === 0) {
+    const archiveLi = document.createElement("li");
+    archiveLi.textContent = "No archived winners yet.";
+    refs.weeklyWinnersList.append(archiveLi);
+  } else {
+    for (const winner of winners) {
+      const li = document.createElement("li");
+      li.textContent = `${winner.weekKey}: ${winner.name} (${winner.xp} XP)`;
+      refs.weeklyWinnersList.append(li);
+    }
+  }
+}
+
+function renderSchedule() {
+  refs.adminScheduleForm.hidden = !session.isAdminSignedIn;
+  refs.scheduleList.textContent = "";
+
+  if (session.isAdminSignedIn) {
+    renderScheduleEmployeeOptions();
+  }
+
+  const sorted = [...state.schedule].sort((a, b) => {
+    return `${a.date} ${a.start}`.localeCompare(`${b.date} ${b.start}`);
+  });
+
+  if (sorted.length === 0) {
+    const li = document.createElement("li");
+    li.textContent = "No schedule shifts added yet.";
+    refs.scheduleList.append(li);
+    return;
+  }
+
+  for (const shift of sorted) {
+    const employee = state.employees.find((item) => item.id === shift.employeeId);
+    const li = document.createElement("li");
+
+    const details = document.createElement("span");
+    details.className = "schedule-meta";
+    details.textContent = `${shift.date} ${shift.start}-${shift.end} | ${employee?.name ?? "Unknown"}${shift.notes ? ` | ${shift.notes}` : ""}`;
+    li.append(details);
+
+    if (session.isAdminSignedIn) {
+      const actions = document.createElement("div");
+      actions.className = "schedule-actions";
+      const removeBtn = document.createElement("button");
+      removeBtn.type = "button";
+      removeBtn.className = "outline role-btn";
+      removeBtn.textContent = "Remove";
+      removeBtn.addEventListener("click", () => removeScheduleEntry(shift.id));
+      actions.append(removeBtn);
+      li.append(actions);
+    }
+
+    refs.scheduleList.append(li);
+  }
+}
+
+function renderScheduleEmployeeOptions() {
+  const current = refs.scheduleEmployee.value;
+  refs.scheduleEmployee.textContent = "";
+
+  const emptyOption = document.createElement("option");
+  emptyOption.value = "";
+  emptyOption.textContent = "Select employee";
+  refs.scheduleEmployee.append(emptyOption);
+
+  for (const employee of state.employees) {
+    const option = document.createElement("option");
+    option.value = employee.id;
+    option.textContent = employee.name;
+    refs.scheduleEmployee.append(option);
+  }
+
+  refs.scheduleEmployee.value = current;
+}
+
+function addScheduleEntry(event) {
+  event.preventDefault();
+  if (!session.isAdminSignedIn) {
+    return;
+  }
+
+  const employeeId = refs.scheduleEmployee.value;
+  const date = refs.scheduleDate.value;
+  const start = refs.scheduleStart.value;
+  const end = refs.scheduleEnd.value;
+  const notes = refs.scheduleNotes.value.trim();
+
+  if (!employeeId || !date || !start || !end) {
+    window.alert("Employee, date, start, and end are required.");
+    return;
+  }
+
+  state.schedule.push({
+    id: crypto.randomUUID(),
+    employeeId,
+    date,
+    start,
+    end,
+    notes
+  });
+
+  refs.scheduleForm.reset();
+  persistAndRender();
+}
+
+function renderXpConfig() {
+  refs.adminXpConfig.hidden = !session.isAdminSignedIn;
+  if (!session.isAdminSignedIn) {
+    return;
+  }
+
+  refs.xpConfigList.textContent = "";
+  const tasks = Object.keys(state.xpConfig).sort((a, b) => a.localeCompare(b));
+
+  for (const taskText of tasks) {
+    const row = document.createElement("label");
+    row.className = "xp-config-row";
+
+    const label = document.createElement("span");
+    label.textContent = taskText;
+
+    const input = document.createElement("input");
+    input.type = "number";
+    input.min = "1";
+    input.step = "1";
+    input.value = String(state.xpConfig[taskText]);
+    input.dataset.taskText = taskText;
+
+    row.append(label, input);
+    refs.xpConfigList.append(row);
+  }
+}
+
+function saveXpConfig(event) {
+  event.preventDefault();
+  if (!session.isAdminSignedIn) {
+    return;
+  }
+
+  const inputs = refs.xpConfigList.querySelectorAll("input[data-task-text]");
+  const next = {};
+
+  for (const input of inputs) {
+    const taskText = input.dataset.taskText;
+    const value = Number(input.value);
+    next[taskText] = Number.isFinite(value) && value > 0 ? Math.round(value) : TASK_XP_DEFAULT;
+  }
+
+  state.xpConfig = next;
+  persistAndRender();
+}
+
+function removeScheduleEntry(shiftId) {
+  if (!session.isAdminSignedIn) {
+    return;
+  }
+  state.schedule = state.schedule.filter((shift) => shift.id !== shiftId);
+  persistAndRender();
+}
+
+function awardXp(employeeId, xp, reason, timestamp = new Date().toISOString()) {
+  state.xpEvents.push({
+    id: crypto.randomUUID(),
+    employeeId,
+    xp,
+    reason,
+    timestamp
+  });
+}
+
+function getTaskXp(taskText) {
+  if (Object.hasOwn(state.xpConfig, taskText)) {
+    return state.xpConfig[taskText];
+  }
+  return TASK_XP_DEFAULT;
+}
+
+function getTotalXp(employeeId) {
+  return state.xpEvents
+    .filter((event) => event.employeeId === employeeId)
+    .reduce((sum, event) => sum + Number(event.xp || 0), 0);
+}
+
+function getWeeklyXp(employeeId, now) {
+  const weekStart = getWeekStart(now);
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekEnd.getDate() + 7);
+
+  return state.xpEvents
+    .filter((event) => {
+      if (event.employeeId !== employeeId) {
+        return false;
+      }
+      const stamp = new Date(event.timestamp);
+      return stamp >= weekStart && stamp < weekEnd;
+    })
+    .reduce((sum, event) => sum + Number(event.xp || 0), 0);
+}
+
+function getWeekStart(date) {
+  const base = new Date(date);
+  base.setHours(0, 0, 0, 0);
+  const day = base.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  base.setDate(base.getDate() + diff);
+  return base;
+}
+
+function getWeekKey(date) {
+  return getWeekStart(date).toISOString().slice(0, 10);
+}
+
+function getWeeklyLeader(now) {
+  const weekStart = getWeekStart(now);
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekEnd.getDate() + 7);
+
+  const weeklyTotals = new Map();
+  for (const event of state.xpEvents) {
+    const stamp = new Date(event.timestamp);
+    if (stamp >= weekStart && stamp < weekEnd) {
+      weeklyTotals.set(event.employeeId, (weeklyTotals.get(event.employeeId) ?? 0) + Number(event.xp || 0));
+    }
+  }
+
+  let winner = null;
+  for (const employee of state.employees) {
+    const xp = weeklyTotals.get(employee.id) ?? 0;
+    if (!winner || xp > winner.xp) {
+      winner = { id: employee.id, name: employee.name, xp };
+    }
+  }
+
+  if (!winner || winner.xp <= 0) {
+    return null;
+  }
+
+  return winner;
+}
+
+function maybeAnnounceWeeklyWinner(clockOutEmployeeId, now) {
+  if (now.getDay() !== 0) {
+    return;
+  }
+
+  const weekKey = getWeekKey(now);
+  if (state.lastCelebrationWeekKey === weekKey) {
+    return;
+  }
+
+  const leader = getWeeklyLeader(now);
+  if (!leader || leader.id !== clockOutEmployeeId) {
+    return;
+  }
+
+  state.lastCelebrationWeekKey = weekKey;
+  state.weeklyWinners.push({
+    weekKey,
+    employeeId: leader.id,
+    name: leader.name,
+    xp: leader.xp,
+    announcedAt: now.toISOString()
+  });
+
+  showCelebration(`Celebration! ${leader.name} leads this week with ${leader.xp} XP!`);
+}
+
+function showCelebration(message) {
+  refs.celebrationMessage.textContent = message;
+  refs.celebrationModal.hidden = false;
+}
+
+function closeCelebration() {
+  refs.celebrationModal.hidden = true;
+}
+
 function updateLiveClockIns() {
   const count = state.entries.filter((entry) => !entry.clockOut).length;
   refs.liveClockIns.textContent = String(count);
@@ -692,7 +1062,12 @@ function loadState() {
     return {
       employees,
       entries: Array.isArray(parsed.entries) ? parsed.entries : [],
-      procedures: createRoleBasedTasks(employees, parsedProcedures)
+      procedures: createRoleBasedTasks(employees, parsedProcedures),
+      schedule: Array.isArray(parsed.schedule) ? parsed.schedule : [],
+      xpEvents: Array.isArray(parsed.xpEvents) ? parsed.xpEvents : [],
+      lastCelebrationWeekKey: parsed.lastCelebrationWeekKey ?? null,
+      weeklyWinners: Array.isArray(parsed.weeklyWinners) ? parsed.weeklyWinners : [],
+      xpConfig: normalizeXpConfig(parsed.xpConfig)
     };
   } catch {
     return structuredClone(defaultState);
@@ -750,7 +1125,9 @@ function reassignEmployeeRoleTasks(employeeId, nextRole) {
     done: doneByText.get(text) ?? false,
     employeeId,
     role: nextRole,
-    custom: false
+    custom: false,
+    xpAwarded: false,
+    completedAt: null
   }));
 
   state.procedures.push(...nextTasks);
@@ -761,8 +1138,29 @@ function createDefaultState() {
   return {
     employees,
     entries: [],
-    procedures: createRoleBasedTasks(employees)
+    procedures: createRoleBasedTasks(employees),
+    schedule: [],
+    xpEvents: [],
+    lastCelebrationWeekKey: null,
+    weeklyWinners: [],
+    xpConfig: { ...DEFAULT_TASK_XP_BY_TEXT }
   };
+}
+
+function normalizeXpConfig(config) {
+  const merged = { ...DEFAULT_TASK_XP_BY_TEXT };
+  if (!config || typeof config !== "object") {
+    return merged;
+  }
+
+  for (const [taskText, xp] of Object.entries(config)) {
+    const value = Number(xp);
+    if (Number.isFinite(value) && value > 0) {
+      merged[taskText] = Math.round(value);
+    }
+  }
+
+  return merged;
 }
 
 function createRosterEmployees(existingEmployees = []) {
@@ -815,7 +1213,9 @@ function createRoleBasedTasks(employees, existingProcedures = []) {
     text: task.text,
     done: Boolean(task.done),
     employeeId: task.employeeId,
-    role: task.role
+    role: task.role,
+    xpAwarded: Boolean(task.xpAwarded),
+    completedAt: task.completedAt ?? null
   }));
 
   const tasks = [];
@@ -834,7 +1234,9 @@ function createRoleBasedTasks(employees, existingProcedures = []) {
         done: existing?.done ?? false,
         employeeId: employee.id,
         role: employee.role,
-        custom: false
+        custom: false,
+        xpAwarded: existing?.xpAwarded ?? false,
+        completedAt: existing?.completedAt ?? null
       });
     }
   }
@@ -1099,6 +1501,11 @@ function applyCloudState(parsed) {
   state.employees = employees;
   state.entries = Array.isArray(parsed.entries) ? parsed.entries : [];
   state.procedures = createRoleBasedTasks(employees, parsedProcedures);
+  state.schedule = Array.isArray(parsed.schedule) ? parsed.schedule : [];
+  state.xpEvents = Array.isArray(parsed.xpEvents) ? parsed.xpEvents : [];
+  state.lastCelebrationWeekKey = parsed.lastCelebrationWeekKey ?? null;
+  state.weeklyWinners = Array.isArray(parsed.weeklyWinners) ? parsed.weeklyWinners : [];
+  state.xpConfig = normalizeXpConfig(parsed.xpConfig);
 
   localStorage.setItem(
     STORAGE_KEY,
@@ -1114,11 +1521,11 @@ function setSyncStatus(status) {
   }
 
   const map = {
-    local: { text: "Local only", className: "sync-badge sync--local" },
+    local: { text: "Connection failed", className: "sync-badge sync--error" },
     connecting: { text: "Connecting...", className: "sync-badge sync--connecting" },
     syncing: { text: "Syncing...", className: "sync-badge sync--syncing" },
-    synced: { text: "Cloud synced", className: "sync-badge sync--synced" },
-    error: { text: "Sync error", className: "sync-badge sync--error" }
+    synced: { text: "Connected", className: "sync-badge sync--synced" },
+    error: { text: "Connection failed", className: "sync-badge sync--error" }
   };
 
   const next = map[status] ?? map.local;
