@@ -1,13 +1,28 @@
 const STORAGE_KEY = "northshift-state-v1";
 
+const ROSTER = [
+  { name: "Michaela Silva", role: "Manager" },
+  { name: "Krysta Rodriguez", role: "Chef" },
+  { name: "Max Hawthrone", role: "Service" },
+  { name: "Landyn Silva", role: "Flex" },
+  { name: "Olivia Garcia", role: "Flex" }
+];
+
+const FLEX_RATE = 10;
+const STANDARD_RATE = 15;
+const DEFAULT_PROCEDURE_TEXTS = [
+  "Morning: Sweep and Mop the Front and Back",
+  "Morning: Check and Clean the Bathrooms",
+  "Morning: Check Inventory",
+  "Close: Sweep and Mop the Front and Back",
+  "Close: Check and Clean the Bathrooms",
+  "Close: Check Inventory"
+];
+
 const defaultState = {
-  employees: [],
+  employees: createRosterEmployees(),
   entries: [],
-  procedures: [
-    { id: crypto.randomUUID(), text: "Daily safety walk", done: false },
-    { id: crypto.randomUUID(), text: "Cash drawer count", done: false },
-    { id: crypto.randomUUID(), text: "Equipment shutdown check", done: false }
-  ]
+  procedures: createDefaultProcedures()
 };
 
 const state = loadState();
@@ -15,9 +30,6 @@ const state = loadState();
 const refs = {
   todayDate: document.getElementById("todayDate"),
   liveClockIns: document.getElementById("liveClockIns"),
-  employeeForm: document.getElementById("employeeForm"),
-  employeeName: document.getElementById("employeeName"),
-  employeeRole: document.getElementById("employeeRole"),
   employeeList: document.getElementById("employeeList"),
   clockEmployee: document.getElementById("clockEmployee"),
   clockInBtn: document.getElementById("clockInBtn"),
@@ -35,29 +47,10 @@ bindEvents();
 renderAll();
 
 function bindEvents() {
-  refs.employeeForm.addEventListener("submit", addEmployee);
   refs.clockInBtn.addEventListener("click", clockIn);
   refs.clockOutBtn.addEventListener("click", clockOut);
   refs.procedureForm.addEventListener("submit", addProcedure);
   refs.exportCsvBtn.addEventListener("click", exportCsv);
-}
-
-function addEmployee(event) {
-  event.preventDefault();
-  const name = refs.employeeName.value.trim();
-  const role = refs.employeeRole.value.trim();
-  if (!name || !role) {
-    return;
-  }
-
-  state.employees.push({
-    id: crypto.randomUUID(),
-    name,
-    role
-  });
-
-  refs.employeeForm.reset();
-  persistAndRender();
 }
 
 function clockIn() {
@@ -156,7 +149,7 @@ function renderEmployees() {
 
   if (state.employees.length === 0) {
     const li = document.createElement("li");
-    li.textContent = "No employees yet.";
+    li.textContent = "No employees available.";
     refs.employeeList.append(li);
   }
 }
@@ -169,7 +162,7 @@ function renderClockEmployeeOptions() {
   emptyOption.value = "";
   emptyOption.textContent = state.employees.length
     ? "Select employee"
-    : "Add an employee first";
+    : "No employees available";
   refs.clockEmployee.append(emptyOption);
 
   for (const employee of state.employees) {
@@ -340,12 +333,13 @@ function loadState() {
 
   try {
     const parsed = JSON.parse(stored);
+    const parsedEmployees = Array.isArray(parsed.employees) ? parsed.employees : [];
+    const employees = createRosterEmployees(parsedEmployees);
+    const parsedProcedures = Array.isArray(parsed.procedures) ? parsed.procedures : [];
     return {
-      employees: Array.isArray(parsed.employees) ? parsed.employees : [],
+      employees,
       entries: Array.isArray(parsed.entries) ? parsed.entries : [],
-      procedures: Array.isArray(parsed.procedures)
-        ? parsed.procedures
-        : structuredClone(defaultState.procedures)
+      procedures: createDefaultProcedures(parsedProcedures)
     };
   } catch {
     return structuredClone(defaultState);
@@ -355,4 +349,31 @@ function loadState() {
 function persistAndRender() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   renderAll();
+}
+
+function createRosterEmployees(existingEmployees = []) {
+  return ROSTER.map((employee) => {
+    const existing = existingEmployees.find((item) => item.name === employee.name);
+    return {
+      id: existing?.id ?? crypto.randomUUID(),
+      name: employee.name,
+      role: employee.role,
+      hourlyRate: getHourlyRate(employee.role)
+    };
+  });
+}
+
+function getHourlyRate(role) {
+  return role.toLowerCase() === "flex" ? FLEX_RATE : STANDARD_RATE;
+}
+
+function createDefaultProcedures(existingProcedures = []) {
+  return DEFAULT_PROCEDURE_TEXTS.map((text) => {
+    const existing = existingProcedures.find((item) => item.text === text);
+    return {
+      id: existing?.id ?? crypto.randomUUID(),
+      text,
+      done: existing?.done ?? false
+    };
+  });
 }
