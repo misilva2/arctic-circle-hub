@@ -37,7 +37,7 @@ const ROSTER = [
 
 const ADMIN_NAME = "Michaela Silva";
 const ADMIN_PASSCODE = "arctic-admin";
-const EDITABLE_ROLES = ["Chef", "Service"];
+const EDITABLE_ROLES = ["Chef", "Prep", "Service", "Off"];
 
 const STANDARD_RATE = 15;
 const INVENTORY_REMINDER = "Reminder: Notify the manager when inventory is low.";
@@ -45,6 +45,11 @@ const CHEF_TASKS = [
   "Close: Clean grill",
   "Close: Take inventory",
   "Help prep with closing tasks"
+];
+const PREP_TASKS = [
+  "Morning: Prep ingredients and stations",
+  "Close: Label and store remaining prep",
+  "Support service restock and handoff"
 ];
 const SERVICE_TASKS = [
   "Morning and Close: Wipe down all surfaces",
@@ -54,7 +59,9 @@ const SERVICE_TASKS = [
 const ROLE_TASKS = {
   Manager: [INVENTORY_REMINDER],
   Chef: [...CHEF_TASKS, INVENTORY_REMINDER],
-  Service: [...SERVICE_TASKS, INVENTORY_REMINDER]
+  Prep: [...PREP_TASKS, INVENTORY_REMINDER],
+  Service: [...SERVICE_TASKS, INVENTORY_REMINDER],
+  Off: []
 };
 
 const ON_TIME_XP = 50;
@@ -63,6 +70,9 @@ const DEFAULT_TASK_XP_BY_TEXT = {
   "Close: Clean grill": 35,
   "Close: Take inventory": 45,
   "Help prep with closing tasks": 25,
+  "Morning: Prep ingredients and stations": 30,
+  "Close: Label and store remaining prep": 25,
+  "Support service restock and handoff": 20,
   "Morning and Close: Wipe down all surfaces": 20,
   "Morning and Close: Sweep and mop front": 30,
   "Morning and Close: Restock": 30,
@@ -328,25 +338,30 @@ function renderEmployees() {
         changeEmployeeRole(employee.id, roleSelect.value);
       });
 
-      // PIN change
-      const pinInput = document.createElement("input");
-      pinInput.type = "text";
-      pinInput.value = employee.pin;
-      pinInput.maxLength = 10;
-      pinInput.className = "pin-input";
-      pinInput.setAttribute("aria-label", `PIN for ${employee.name}`);
-      pinInput.disabled = !session.isAdminSignedIn;
+      if (session.isAdminSignedIn) {
+        // PIN values are only visible while admin is signed in.
+        const pinInput = document.createElement("input");
+        pinInput.type = "text";
+        pinInput.value = employee.pin;
+        pinInput.maxLength = 10;
+        pinInput.className = "pin-input";
+        pinInput.setAttribute("aria-label", `PIN for ${employee.name}`);
 
-      const pinBtn = document.createElement("button");
-      pinBtn.type = "button";
-      pinBtn.className = "outline role-btn";
-      pinBtn.textContent = "Change PIN";
-      pinBtn.disabled = !session.isAdminSignedIn;
-      pinBtn.addEventListener("click", () => {
-        changeEmployeePin(employee.id, pinInput.value);
-      });
+        const pinBtn = document.createElement("button");
+        pinBtn.type = "button";
+        pinBtn.className = "outline role-btn";
+        pinBtn.textContent = "Change PIN";
+        pinBtn.addEventListener("click", () => {
+          changeEmployeePin(employee.id, pinInput.value);
+        });
 
-      li.append(roleSelect, roleBtn, pinInput, pinBtn);
+        li.append(roleSelect, roleBtn, pinInput, pinBtn);
+      } else {
+        const pinHiddenBadge = document.createElement("span");
+        pinHiddenBadge.className = "admin-badge";
+        pinHiddenBadge.textContent = "PIN hidden";
+        li.append(roleSelect, roleBtn, pinHiddenBadge);
+      }
     }
 
     refs.employeeList.append(li);

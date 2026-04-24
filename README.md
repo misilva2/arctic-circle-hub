@@ -13,7 +13,9 @@ Employee time tracking and role-based task management web app.
 - Admin sign-in can update task completion for all employees
 - PINs are assigned by employee order starting at 1
 - Chef tasks are fixed to closing and prep-support duties
-- Flex covers both Prep Closing and Service tasks
+- Prep tasks are fixed to station prep, storage, and handoff duties
+- Service tasks are fixed to cleaning and restock duties
+- Off role removes all task assignments for that employee
 - Inventory reminder included for all positions
 - Hours summary by employee
 - CSV export for timesheet entries
