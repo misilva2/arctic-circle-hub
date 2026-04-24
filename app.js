@@ -110,6 +110,11 @@ const refs = {
   adminSignInBtn: document.getElementById("adminSignInBtn"),
   adminSignOutBtn: document.getElementById("adminSignOutBtn"),
   adminStatus: document.getElementById("adminStatus"),
+  taskEmployee: document.getElementById("taskEmployee"),
+  taskPin: document.getElementById("taskPin"),
+  taskSignInBtn: document.getElementById("taskSignInBtn"),
+  taskSignOutBtn: document.getElementById("taskSignOutBtn"),
+  taskAuthStatus: document.getElementById("taskAuthStatus"),
   unavailForm: document.getElementById("unavailForm"),
   unavailEmployee: document.getElementById("unavailEmployee"),
   unavailPin: document.getElementById("unavailPin"),
@@ -151,6 +156,8 @@ function bindEvents() {
   refs.xpConfigForm.addEventListener("submit", saveXpConfig);
   refs.closeCelebrationBtn.addEventListener("click", closeCelebration);
   refs.adminSignInBtn.addEventListener("click", signInAdmin);
+  refs.taskSignInBtn.addEventListener("click", signInTaskEmployee);
+  refs.taskSignOutBtn.addEventListener("click", signOutTaskEmployee);
   refs.unavailForm.addEventListener("submit", submitUnavailability);
   refs.adminSignOutBtn.addEventListener("click", signOutAdmin);
 }
@@ -170,6 +177,33 @@ function signInAdmin() {
 function signOutAdmin() {
   session.isAdminSignedIn = false;
   refs.adminPasscode.value = "";
+  renderAll();
+}
+
+function signInTaskEmployee() {
+  const employeeId = refs.taskEmployee.value;
+  const pin = refs.taskPin.value.trim();
+
+  if (!employeeId || !pin) {
+    window.alert("Select employee and enter PIN.");
+    return;
+  }
+
+  const employee = state.employees.find((item) => item.id === employeeId);
+  if (!employee || pin !== employee.pin) {
+    window.alert("Incorrect PIN.");
+    refs.taskPin.value = "";
+    return;
+  }
+
+  session.signedInEmployeeId = employee.id;
+  refs.taskPin.value = "";
+  renderAll();
+}
+
+function signOutTaskEmployee() {
+  session.signedInEmployeeId = null;
+  refs.taskPin.value = "";
   renderAll();
 }
 
@@ -254,8 +288,8 @@ function toggleProcedure(procedureId) {
     return;
   }
 
-  if (!canUpdateProcedure()) {
-    window.alert("You can only update your own tasks unless signed in as admin.");
+  if (!canUpdateProcedure(procedure)) {
+    window.alert("Sign in with your PIN to update your own tasks, or sign in as admin.");
     return;
   }
 
@@ -274,8 +308,15 @@ function toggleProcedure(procedureId) {
   persistAndRender();
 }
 
-function canUpdateProcedure() {
-  return session.isAdminSignedIn;
+function canUpdateProcedure(procedure) {
+  if (session.isAdminSignedIn) {
+    return true;
+  }
+  return Boolean(
+    procedure &&
+    session.signedInEmployeeId &&
+    procedure.employeeId === session.signedInEmployeeId
+  );
 }
 
 function renderAll() {
@@ -996,11 +1037,50 @@ function updateLiveClockIns() {
 }
 
 function renderTaskAccess() {
+  renderTaskEmployeeOptions();
+
+  const signedInEmployee = state.employees.find(
+    (employee) => employee.id === session.signedInEmployeeId
+  );
+
   refs.adminStatus.textContent = session.isAdminSignedIn
     ? `Signed in as ${ADMIN_NAME}. You can manage tasks, roles, PINs, and time entries.`
     : `Admin controls are locked. Sign in as ${ADMIN_NAME} to make changes.`;
   refs.adminSignInBtn.disabled = session.isAdminSignedIn;
   refs.adminSignOutBtn.disabled = !session.isAdminSignedIn;
+
+  refs.taskAuthStatus.textContent = signedInEmployee
+    ? `Signed in as ${signedInEmployee.name}. You can check off your own tasks.`
+    : "Employee task controls are locked. Sign in with your PIN to update your tasks.";
+  refs.taskSignInBtn.disabled = Boolean(signedInEmployee);
+  refs.taskSignOutBtn.disabled = !signedInEmployee;
+
+  if (signedInEmployee) {
+    refs.taskEmployee.value = signedInEmployee.id;
+    refs.taskEmployee.disabled = true;
+  } else {
+    refs.taskEmployee.disabled = false;
+  }
+}
+
+function renderTaskEmployeeOptions() {
+  const selected = refs.taskEmployee.value;
+  refs.taskEmployee.textContent = "";
+
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = "Select employee";
+  refs.taskEmployee.append(placeholder);
+
+  for (const employee of state.employees) {
+    const option = document.createElement("option");
+    option.value = employee.id;
+    option.textContent = employee.name;
+    refs.taskEmployee.append(option);
+  }
+
+  const selectedExists = state.employees.some((employee) => employee.id === selected);
+  refs.taskEmployee.value = selectedExists ? selected : "";
 }
 
 function calculateHours(clockIn, clockOut) {

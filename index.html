@@ -141,6 +141,27 @@
             </div>
             <p id="adminStatus" class="panel-note"></p>
           </div>
+          <div id="taskEmployeeAuth" class="admin-auth">
+            <label>
+              Employee
+              <select id="taskEmployee"></select>
+            </label>
+            <label>
+              Employee PIN
+              <input
+                type="password"
+                id="taskPin"
+                inputmode="numeric"
+                placeholder="Enter your PIN"
+                autocomplete="off"
+              />
+            </label>
+            <div class="button-row">
+              <button type="button" id="taskSignInBtn">Employee Sign In</button>
+              <button type="button" id="taskSignOutBtn" class="outline">Employee Sign Out</button>
+            </div>
+            <p id="taskAuthStatus" class="panel-note"></p>
+          </div>
         </div>
         <ul id="procedureList" class="procedure-list"></ul>
       </section>
