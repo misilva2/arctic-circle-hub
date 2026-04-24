@@ -1,28 +1,67 @@
-const STORAGE_KEY = "northshift-state-v1";
+const STORAGE_KEY = "arctic-hub-state-v4";
+const LEGACY_STORAGE_KEYS = ["arctic-hub-state-v3", "arctic-hub-state-v2", "northshift-state-v1"];
+const TASK_SCHEMA_VERSION = 3;
+
+// ── Firebase Cloud Sync ───────────────────────────────────────────────────────
+// To enable real-time sync across all devices:
+//   1. Go to https://console.firebase.google.com and create a project.
+//   2. Click "Add app" > Web, register the app, and copy the firebaseConfig values.
+//   3. Paste the values into FIREBASE_CONFIG below.
+//   4. In Firebase console: Build > Firestore Database > Create database.
+//      Choose "Start in test mode" so the team can read/write without login.
+//   5. Reload the app on any device — changes sync in real time automatically.
+//
+// Leave apiKey as "" to stay in local-storage-only mode.
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCp4q7XFt2MIq10OHkAaUZEVESUAFwXnKM",
+  authDomain: "arctichub-8c80e.firebaseapp.com",
+  projectId: "arctichub-8c80e",
+  storageBucket: "arctichub-8c80e.firebasestorage.app",
+  messagingSenderId: "674375887667",
+  appId: "1:674375887667:web:24819bfed7757adba5ec46",
+  measurementId: "G-SDTGZE68GV"
+};
+
+const FIRESTORE_PATH = { collection: "arctic-hub", doc: "state" };
+let db = null;
+let cloudWriteInFlight = false;
+// ─────────────────────────────────────────────────────────────────────────────
 
 const ROSTER = [
   { name: "Michaela Silva", role: "Manager" },
   { name: "Krysta Rodriguez", role: "Chef" },
   { name: "Max Hawthrone", role: "Service" },
-  { name: "Landyn Silva", role: "Flex" },
-  { name: "Olivia Garcia", role: "Flex" }
+  { name: "Landyn Silva", role: "Service" },
+  { name: "Olivia Garcia", role: "Service" }
 ];
 
-const FLEX_RATE = 10;
+const ADMIN_NAME = "Michaela Silva";
+const ADMIN_PASSCODE = "arctic-admin";
+const EDITABLE_ROLES = ["Chef", "Service"];
+
 const STANDARD_RATE = 15;
-const DEFAULT_PROCEDURE_TEXTS = [
-  "Morning: Sweep and Mop the Front and Back",
-  "Morning: Check and Clean the Bathrooms",
-  "Morning: Check Inventory",
-  "Close: Sweep and Mop the Front and Back",
-  "Close: Check and Clean the Bathrooms",
-  "Close: Check Inventory"
+const INVENTORY_REMINDER = "Reminder: Notify the manager when inventory is low.";
+const CHEF_TASKS = [
+  "Close: Clean grill",
+  "Close: Take inventory",
+  "Help prep with closing tasks"
 ];
+const SERVICE_TASKS = [
+  "Morning and Close: Wipe down all surfaces",
+  "Morning and Close: Sweep and mop front",
+  "Morning and Close: Restock"
+];
+const ROLE_TASKS = {
+  Manager: [INVENTORY_REMINDER],
+  Chef: [...CHEF_TASKS, INVENTORY_REMINDER],
+  Service: [...SERVICE_TASKS, INVENTORY_REMINDER]
+};
 
-const defaultState = {
-  employees: createRosterEmployees(),
-  entries: [],
-  procedures: createDefaultProcedures()
+const defaultState = createDefaultState();
+
+const session = {
+  isAdminSignedIn: false,
+  signedInEmployeeId: null
 };
 
 const state = loadState();
@@ -32,30 +71,83 @@ const refs = {
   liveClockIns: document.getElementById("liveClockIns"),
   employeeList: document.getElementById("employeeList"),
   clockEmployee: document.getElementById("clockEmployee"),
+  clockPin: document.getElementById("clockPin"),
   clockInBtn: document.getElementById("clockInBtn"),
   clockOutBtn: document.getElementById("clockOutBtn"),
   entryTableBody: document.getElementById("entryTableBody"),
   summaryCards: document.getElementById("summaryCards"),
-  procedureForm: document.getElementById("procedureForm"),
-  procedureInput: document.getElementById("procedureInput"),
   procedureList: document.getElementById("procedureList"),
   procedureTemplate: document.getElementById("procedureTemplate"),
-  exportCsvBtn: document.getElementById("exportCsvBtn")
+  exportCsvBtn: document.getElementById("exportCsvBtn"),
+  addTimeForm: document.getElementById("addTimeForm"),
+  addTimeEmployee: document.getElementById("addTimeEmployee"),
+  addTimeIn: document.getElementById("addTimeIn"),
+  addTimeOut: document.getElementById("addTimeOut"),
+  adminTimeForm: document.getElementById("adminTimeForm"),
+  adminPasscode: document.getElementById("adminPasscode"),
+  adminSignInBtn: document.getElementById("adminSignInBtn"),
+  adminSignOutBtn: document.getElementById("adminSignOutBtn"),
+  adminStatus: document.getElementById("adminStatus"),
+  unavailForm: document.getElementById("unavailForm"),
+  unavailEmployee: document.getElementById("unavailEmployee"),
+  unavailPin: document.getElementById("unavailPin"),
+  unavailCalendar: document.getElementById("unavailCalendar"),
+  unavailMonthLabel: document.getElementById("unavailMonthLabel"),
+  unavailNotes: document.getElementById("unavailNotes"),
+  unavailSubmitBtn: document.getElementById("unavailSubmitBtn"),
+  unavailStatus: document.getElementById("unavailStatus"),
+  unavailDueBadge: document.getElementById("unavailDueBadge")
 };
+
+const syncStatusEl = document.getElementById("syncStatus");
 
 bindEvents();
 renderAll();
+initFirebase();
 
 function bindEvents() {
   refs.clockInBtn.addEventListener("click", clockIn);
   refs.clockOutBtn.addEventListener("click", clockOut);
-  refs.procedureForm.addEventListener("submit", addProcedure);
   refs.exportCsvBtn.addEventListener("click", exportCsv);
+  refs.addTimeForm.addEventListener("submit", addManualEntry);
+  refs.adminSignInBtn.addEventListener("click", signInAdmin);
+  refs.unavailForm.addEventListener("submit", submitUnavailability);
+  refs.adminSignOutBtn.addEventListener("click", signOutAdmin);
+}
+
+function signInAdmin() {
+  const passcode = refs.adminPasscode.value.trim();
+  if (passcode !== ADMIN_PASSCODE) {
+    window.alert("Incorrect admin passcode.");
+    return;
+  }
+
+  session.isAdminSignedIn = true;
+  refs.adminPasscode.value = "";
+  renderTaskAccess();
+  renderProcedures();
+}
+
+function signOutAdmin() {
+  session.isAdminSignedIn = false;
+  refs.adminPasscode.value = "";
+  renderTaskAccess();
+  renderProcedures();
 }
 
 function clockIn() {
   const employeeId = refs.clockEmployee.value;
-  if (!employeeId) {
+  const pin = refs.clockPin.value.trim();
+
+  if (!employeeId || !pin) {
+    window.alert("Select employee and enter PIN.");
+    return;
+  }
+
+  const employee = state.employees.find((e) => e.id === employeeId);
+  if (!employee || pin !== employee.pin) {
+    window.alert("Incorrect PIN.");
+    refs.clockPin.value = "";
     return;
   }
 
@@ -64,6 +156,7 @@ function clockIn() {
   );
   if (openEntry) {
     window.alert("This employee is already clocked in.");
+    refs.clockPin.value = "";
     return;
   }
 
@@ -74,12 +167,23 @@ function clockIn() {
     clockOut: null
   });
 
+  refs.clockPin.value = "";
   persistAndRender();
 }
 
 function clockOut() {
   const employeeId = refs.clockEmployee.value;
-  if (!employeeId) {
+  const pin = refs.clockPin.value.trim();
+
+  if (!employeeId || !pin) {
+    window.alert("Select employee and enter PIN.");
+    return;
+  }
+
+  const employee = state.employees.find((e) => e.id === employeeId);
+  if (!employee || pin !== employee.pin) {
+    window.alert("Incorrect PIN.");
+    refs.clockPin.value = "";
     return;
   }
 
@@ -89,22 +193,12 @@ function clockOut() {
 
   if (!openEntry) {
     window.alert("No open shift found for this employee.");
+    refs.clockPin.value = "";
     return;
   }
 
   openEntry.clockOut = new Date().toISOString();
-  persistAndRender();
-}
-
-function addProcedure(event) {
-  event.preventDefault();
-  const text = refs.procedureInput.value.trim();
-  if (!text) {
-    return;
-  }
-
-  state.procedures.push({ id: crypto.randomUUID(), text, done: false });
-  refs.procedureForm.reset();
+  refs.clockPin.value = "";
   persistAndRender();
 }
 
@@ -114,13 +208,17 @@ function toggleProcedure(procedureId) {
     return;
   }
 
+  if (!canUpdateProcedure()) {
+    window.alert("You can only update your own tasks unless signed in as admin.");
+    return;
+  }
+
   procedure.done = !procedure.done;
   persistAndRender();
 }
 
-function removeProcedure(procedureId) {
-  state.procedures = state.procedures.filter((item) => item.id !== procedureId);
-  persistAndRender();
+function canUpdateProcedure() {
+  return session.isAdminSignedIn;
 }
 
 function renderAll() {
@@ -133,17 +231,70 @@ function renderAll() {
 
   renderEmployees();
   renderClockEmployeeOptions();
+  renderAdminTimeForm();
   renderEntries();
   renderProcedures();
   renderSummary();
   updateLiveClockIns();
+  renderTaskAccess();
+  renderUnavailForm();
 }
 
 function renderEmployees() {
   refs.employeeList.textContent = "";
   for (const employee of state.employees) {
     const li = document.createElement("li");
-    li.textContent = `${employee.name} - ${employee.role}`;
+    li.className = "employee-item";
+
+    const details = document.createElement("span");
+    details.textContent = `${employee.name} — ${employee.role}`;
+    li.append(details);
+
+    if (isAdmin(employee)) {
+      const adminBadge = document.createElement("span");
+      adminBadge.className = "admin-badge";
+      adminBadge.textContent = "Admin";
+      li.append(adminBadge);
+    } else if (session.isAdminSignedIn) {
+      // Role change
+      const roleSelect = document.createElement("select");
+      roleSelect.className = "role-select";
+      roleSelect.setAttribute("aria-label", `Change role for ${employee.name}`);
+      for (const role of EDITABLE_ROLES) {
+        const option = document.createElement("option");
+        option.value = role;
+        option.textContent = role;
+        roleSelect.append(option);
+      }
+      roleSelect.value = employee.role;
+
+      const roleBtn = document.createElement("button");
+      roleBtn.type = "button";
+      roleBtn.className = "outline role-btn";
+      roleBtn.textContent = "Change Role";
+      roleBtn.addEventListener("click", () => {
+        changeEmployeeRole(employee.id, roleSelect.value);
+      });
+
+      // PIN change
+      const pinInput = document.createElement("input");
+      pinInput.type = "text";
+      pinInput.value = employee.pin;
+      pinInput.maxLength = 10;
+      pinInput.className = "pin-input";
+      pinInput.setAttribute("aria-label", `PIN for ${employee.name}`);
+
+      const pinBtn = document.createElement("button");
+      pinBtn.type = "button";
+      pinBtn.className = "outline role-btn";
+      pinBtn.textContent = "Change PIN";
+      pinBtn.addEventListener("click", () => {
+        changeEmployeePin(employee.id, pinInput.value);
+      });
+
+      li.append(roleSelect, roleBtn, pinInput, pinBtn);
+    }
+
     refs.employeeList.append(li);
   }
 
@@ -175,12 +326,89 @@ function renderClockEmployeeOptions() {
   refs.clockEmployee.value = current;
 }
 
+function renderAdminTimeForm() {
+  if (!refs.adminTimeForm) {
+    return;
+  }
+
+  refs.adminTimeForm.hidden = !session.isAdminSignedIn;
+
+  if (!session.isAdminSignedIn) {
+    return;
+  }
+
+  const current = refs.addTimeEmployee.value;
+  refs.addTimeEmployee.textContent = "";
+
+  const emptyOption = document.createElement("option");
+  emptyOption.value = "";
+  emptyOption.textContent = "Select employee";
+  refs.addTimeEmployee.append(emptyOption);
+
+  for (const employee of state.employees) {
+    const option = document.createElement("option");
+    option.value = employee.id;
+    option.textContent = employee.name;
+    refs.addTimeEmployee.append(option);
+  }
+
+  const hasCurrent = state.employees.some((employee) => employee.id === current);
+  refs.addTimeEmployee.value = hasCurrent ? current : "";
+}
+
+function addManualEntry(event) {
+  event.preventDefault();
+
+  if (!session.isAdminSignedIn) {
+    return;
+  }
+
+  const employeeId = refs.addTimeEmployee.value;
+  const clockInValue = refs.addTimeIn.value;
+  const clockOutValue = refs.addTimeOut.value;
+
+  if (!employeeId || !clockInValue) {
+    window.alert("Employee and Clock In time are required.");
+    return;
+  }
+
+  state.entries.push({
+    id: crypto.randomUUID(),
+    employeeId,
+    clockIn: new Date(clockInValue).toISOString(),
+    clockOut: clockOutValue ? new Date(clockOutValue).toISOString() : null
+  });
+
+  refs.addTimeForm.reset();
+  persistAndRender();
+}
+
+function changeEmployeePin(employeeId, newPin) {
+  if (!session.isAdminSignedIn) {
+    return;
+  }
+
+  const trimmed = String(newPin ?? "").trim();
+  if (!trimmed) {
+    window.alert("PIN cannot be empty.");
+    return;
+  }
+
+  const employee = state.employees.find((item) => item.id === employeeId);
+  if (!employee) {
+    return;
+  }
+
+  employee.pin = trimmed;
+  persistAndRender();
+}
+
 function renderEntries() {
   refs.entryTableBody.textContent = "";
 
   if (state.entries.length === 0) {
     const row = document.createElement("tr");
-    row.innerHTML = '<td colspan="5">No time entries yet.</td>';
+    row.innerHTML = '<td colspan="6">No time entries yet.</td>';
     refs.entryTableBody.append(row);
     return;
   }
@@ -194,41 +422,155 @@ function renderEntries() {
     if (!employee) {
       continue;
     }
-
-    const row = document.createElement("tr");
-    row.innerHTML = `
-      <td>${employee.name}</td>
-      <td>${employee.role}</td>
-      <td>${formatDateTime(entry.clockIn)}</td>
-      <td>${entry.clockOut ? formatDateTime(entry.clockOut) : "Open"}</td>
-      <td>${calculateHours(entry.clockIn, entry.clockOut)}</td>
-    `;
-    refs.entryTableBody.append(row);
+    refs.entryTableBody.append(buildEntryRow(entry, employee));
   }
+}
+
+function buildEntryRow(entry, employee) {
+  const row = document.createElement("tr");
+  row.dataset.entryId = entry.id;
+
+  const editBtn = document.createElement("button");
+  editBtn.type = "button";
+  editBtn.className = "outline role-btn";
+  editBtn.textContent = "Edit";
+  editBtn.disabled = !session.isAdminSignedIn;
+  editBtn.addEventListener("click", () => startEditEntry(entry.id));
+
+  row.innerHTML = `
+    <td>${employee.name}</td>
+    <td>${employee.role}</td>
+    <td>${formatDateTime(entry.clockIn)}</td>
+    <td>${entry.clockOut ? formatDateTime(entry.clockOut) : "Open"}</td>
+    <td>${calculateHours(entry.clockIn, entry.clockOut)}</td>
+    <td></td>
+  `;
+  row.querySelector("td:last-child").append(editBtn);
+  return row;
+}
+
+function startEditEntry(entryId) {
+  if (!session.isAdminSignedIn) {
+    return;
+  }
+
+  const entry = state.entries.find((item) => item.id === entryId);
+  const employee = state.employees.find((item) => item.id === entry?.employeeId);
+  if (!entry || !employee) {
+    return;
+  }
+
+  const row = refs.entryTableBody.querySelector(`[data-entry-id="${entryId}"]`);
+  if (!row) {
+    return;
+  }
+
+  const toInputValue = (iso) => {
+    if (!iso) {
+      return "";
+    }
+    const d = new Date(iso);
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+
+  const inInput = document.createElement("input");
+  inInput.type = "datetime-local";
+  inInput.value = toInputValue(entry.clockIn);
+  inInput.required = true;
+
+  const outInput = document.createElement("input");
+  outInput.type = "datetime-local";
+  outInput.value = toInputValue(entry.clockOut);
+
+  const saveBtn = document.createElement("button");
+  saveBtn.type = "button";
+  saveBtn.textContent = "Save";
+  saveBtn.addEventListener("click", () => saveEditEntry(entryId, inInput.value, outInput.value));
+
+  const cancelBtn = document.createElement("button");
+  cancelBtn.type = "button";
+  cancelBtn.className = "outline";
+  cancelBtn.textContent = "Cancel";
+  cancelBtn.addEventListener("click", () => renderEntries());
+
+  row.textContent = "";
+
+  const nameTd = document.createElement("td");
+  nameTd.textContent = employee.name;
+
+  const roleTd = document.createElement("td");
+  roleTd.textContent = employee.role;
+
+  const inTd = document.createElement("td");
+  inTd.append(inInput);
+
+  const outTd = document.createElement("td");
+  outTd.append(outInput);
+
+  const hoursTd = document.createElement("td");
+  hoursTd.textContent = "-";
+
+  const actionTd = document.createElement("td");
+  const btnRow = document.createElement("div");
+  btnRow.className = "button-row";
+  btnRow.append(saveBtn, cancelBtn);
+  actionTd.append(btnRow);
+
+  row.append(nameTd, roleTd, inTd, outTd, hoursTd, actionTd);
+}
+
+function saveEditEntry(entryId, clockInValue, clockOutValue) {
+  if (!clockInValue) {
+    window.alert("Clock In time is required.");
+    return;
+  }
+
+  const entry = state.entries.find((item) => item.id === entryId);
+  if (!entry) {
+    return;
+  }
+
+  entry.clockIn = new Date(clockInValue).toISOString();
+  entry.clockOut = clockOutValue ? new Date(clockOutValue).toISOString() : null;
+  persistAndRender();
 }
 
 function renderProcedures() {
   refs.procedureList.textContent = "";
 
-  for (const procedure of state.procedures) {
+  const sortedProcedures = [...state.procedures].sort((a, b) => {
+    const aEmployee = state.employees.find((item) => item.id === a.employeeId);
+    const bEmployee = state.employees.find((item) => item.id === b.employeeId);
+    const aName = aEmployee?.name ?? "";
+    const bName = bEmployee?.name ?? "";
+    return aName.localeCompare(bName) || a.text.localeCompare(b.text);
+  });
+
+  for (const procedure of sortedProcedures) {
     const node = refs.procedureTemplate.content.firstElementChild.cloneNode(true);
     const checkbox = node.querySelector("input[type='checkbox']");
     const text = node.querySelector(".procedure-text");
     const removeBtn = node.querySelector("button");
+    const assignee = state.employees.find((employee) => employee.id === procedure.employeeId);
+    const assigneeText = assignee
+      ? `${assignee.name} (${assignee.role}) - ${procedure.text}`
+      : `${procedure.role} - ${procedure.text}`;
 
     checkbox.checked = procedure.done;
-    text.textContent = procedure.text;
+    checkbox.disabled = !canUpdateProcedure(procedure);
+    removeBtn.style.display = "none";
+    text.textContent = assigneeText;
     node.classList.toggle("done", procedure.done);
 
     checkbox.addEventListener("change", () => toggleProcedure(procedure.id));
-    removeBtn.addEventListener("click", () => removeProcedure(procedure.id));
 
     refs.procedureList.append(node);
   }
 
   if (state.procedures.length === 0) {
     const li = document.createElement("li");
-    li.textContent = "No procedures added.";
+    li.textContent = "No tasks assigned yet.";
     refs.procedureList.append(li);
   }
 }
@@ -267,6 +609,14 @@ function renderSummary() {
 function updateLiveClockIns() {
   const count = state.entries.filter((entry) => !entry.clockOut).length;
   refs.liveClockIns.textContent = String(count);
+}
+
+function renderTaskAccess() {
+  refs.adminStatus.textContent = session.isAdminSignedIn
+    ? `Signed in as ${ADMIN_NAME}. You can manage tasks, roles, PINs, and time entries.`
+    : `Admin controls are locked. Sign in as ${ADMIN_NAME} to make changes.`;
+  refs.adminSignInBtn.disabled = session.isAdminSignedIn;
+  refs.adminSignOutBtn.disabled = !session.isAdminSignedIn;
 }
 
 function calculateHours(clockIn, clockOut) {
@@ -326,7 +676,7 @@ function escapeCsv(value) {
 }
 
 function loadState() {
-  const stored = localStorage.getItem(STORAGE_KEY);
+  const stored = getStoredState();
   if (!stored) {
     return structuredClone(defaultState);
   }
@@ -335,11 +685,14 @@ function loadState() {
     const parsed = JSON.parse(stored);
     const parsedEmployees = Array.isArray(parsed.employees) ? parsed.employees : [];
     const employees = createRosterEmployees(parsedEmployees);
-    const parsedProcedures = Array.isArray(parsed.procedures) ? parsed.procedures : [];
+    const useExistingProcedures = parsed.taskSchemaVersion === TASK_SCHEMA_VERSION;
+    const parsedProcedures = useExistingProcedures && Array.isArray(parsed.procedures)
+      ? parsed.procedures
+      : [];
     return {
       employees,
       entries: Array.isArray(parsed.entries) ? parsed.entries : [],
-      procedures: createDefaultProcedures(parsedProcedures)
+      procedures: createRoleBasedTasks(employees, parsedProcedures)
     };
   } catch {
     return structuredClone(defaultState);
@@ -347,33 +700,446 @@ function loadState() {
 }
 
 function persistAndRender() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  const payload = { ...state, taskSchemaVersion: TASK_SCHEMA_VERSION };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+
+  if (db) {
+    pushStateToCloud();
+  }
+
   renderAll();
 }
 
+function changeEmployeeRole(employeeId, nextRole) {
+  if (!session.isAdminSignedIn) {
+    window.alert("Admin sign-in required to change roles.");
+    return;
+  }
+
+  const employee = state.employees.find((item) => item.id === employeeId);
+  if (!employee) {
+    return;
+  }
+
+  if (isAdmin(employee) || nextRole === "Manager") {
+    window.alert("Only the manager can be admin.");
+    return;
+  }
+
+  if (!EDITABLE_ROLES.includes(nextRole)) {
+    return;
+  }
+
+  employee.role = nextRole;
+  employee.hourlyRate = getHourlyRate();
+  reassignEmployeeRoleTasks(employee.id, nextRole);
+  persistAndRender();
+}
+
+function reassignEmployeeRoleTasks(employeeId, nextRole) {
+  const existingGeneratedTasks = state.procedures.filter(
+    (task) => task.employeeId === employeeId
+  );
+  const doneByText = new Map(existingGeneratedTasks.map((task) => [task.text, task.done]));
+
+  state.procedures = state.procedures.filter((task) => task.employeeId !== employeeId);
+
+  const nextTasks = getTasksForRole(nextRole).map((text) => ({
+    id: crypto.randomUUID(),
+    text,
+    done: doneByText.get(text) ?? false,
+    employeeId,
+    role: nextRole,
+    custom: false
+  }));
+
+  state.procedures.push(...nextTasks);
+}
+
+function createDefaultState() {
+  const employees = createRosterEmployees();
+  return {
+    employees,
+    entries: [],
+    procedures: createRoleBasedTasks(employees)
+  };
+}
+
 function createRosterEmployees(existingEmployees = []) {
-  return ROSTER.map((employee) => {
+  return ROSTER.map((employee, index) => {
     const existing = existingEmployees.find((item) => item.name === employee.name);
+    const role = resolveRole(employee, existing?.role);
     return {
       id: existing?.id ?? crypto.randomUUID(),
       name: employee.name,
-      role: employee.role,
-      hourlyRate: getHourlyRate(employee.role)
+      role,
+      pin: normalizePin(existing?.pin, index),
+      hourlyRate: getHourlyRate()
     };
   });
 }
 
-function getHourlyRate(role) {
-  return role.toLowerCase() === "flex" ? FLEX_RATE : STANDARD_RATE;
+function normalizePin(existingPin, index) {
+  const nextPin = String(index + 1);
+  if (typeof existingPin !== "string") {
+    return nextPin;
+  }
+
+  const trimmed = existingPin.trim();
+  return trimmed || nextPin;
 }
 
-function createDefaultProcedures(existingProcedures = []) {
-  return DEFAULT_PROCEDURE_TEXTS.map((text) => {
-    const existing = existingProcedures.find((item) => item.text === text);
-    return {
-      id: existing?.id ?? crypto.randomUUID(),
-      text,
-      done: existing?.done ?? false
-    };
-  });
+function resolveRole(rosterEmployee, existingRole) {
+  if (rosterEmployee.name === ADMIN_NAME) {
+    return "Manager";
+  }
+
+  if (EDITABLE_ROLES.includes(existingRole)) {
+    return existingRole;
+  }
+
+  return rosterEmployee.role;
+}
+
+function isAdmin(employee) {
+  return employee.name === ADMIN_NAME && employee.role === "Manager";
+}
+
+function getHourlyRate() {
+  return STANDARD_RATE;
+}
+
+function createRoleBasedTasks(employees, existingProcedures = []) {
+  const normalizedExisting = existingProcedures.map((task) => ({
+    id: task.id,
+    text: task.text,
+    done: Boolean(task.done),
+    employeeId: task.employeeId,
+    role: task.role
+  }));
+
+  const tasks = [];
+
+  for (const employee of employees) {
+    const employeeExisting = normalizedExisting.filter(
+      (task) => task.employeeId === employee.id
+    );
+    const generatedByText = new Map(employeeExisting.map((task) => [task.text, task]));
+
+    for (const text of getTasksForRole(employee.role)) {
+      const existing = generatedByText.get(text);
+      tasks.push({
+        id: existing?.id ?? crypto.randomUUID(),
+        text,
+        done: existing?.done ?? false,
+        employeeId: employee.id,
+        role: employee.role,
+        custom: false
+      });
+    }
+  }
+
+  return tasks;
+}
+
+function getTasksForRole(role) {
+  return ROLE_TASKS[role] ?? ROLE_TASKS.Service;
+}
+
+// ── Unavailability ──────────────────────────────────────────────────────────
+
+const MANAGER_EMAIL = "silva.freelance.marketingandmore@gmail.com";
+
+function renderUnavailForm() {
+  // Populate employee dropdown
+  const current = refs.unavailEmployee.value;
+  refs.unavailEmployee.textContent = "";
+
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = "Select your name";
+  refs.unavailEmployee.append(placeholder);
+
+  for (const employee of state.employees) {
+    if (isAdmin(employee)) {
+      continue; // manager doesn't fill this out
+    }
+    const option = document.createElement("option");
+    option.value = employee.id;
+    option.textContent = employee.name;
+    refs.unavailEmployee.append(option);
+  }
+
+  const hasCurrent = state.employees.some((e) => e.id === current);
+  refs.unavailEmployee.value = hasCurrent ? current : "";
+
+  // Build calendar for next month
+  const today = new Date();
+  const targetYear = today.getMonth() === 11 ? today.getFullYear() + 1 : today.getFullYear();
+  const targetMonth = (today.getMonth() + 1) % 12; // 0-based next month
+  const monthName = new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" })
+    .format(new Date(targetYear, targetMonth, 1));
+  refs.unavailMonthLabel.textContent = monthName;
+
+  // Only rebuild calendar if it's empty (preserve selections across re-renders)
+  if (refs.unavailCalendar.childElementCount === 0) {
+    buildUnavailCalendar(targetYear, targetMonth);
+  }
+
+  // Due-date badge
+  const isFirstOfMonth = today.getDate() === 1;
+  refs.unavailDueBadge.textContent = isFirstOfMonth
+    ? "Due today!"
+    : `Due on the 1st (${daysUntilFirst(today)} day${daysUntilFirst(today) === 1 ? "" : "s"} away)`;
+  refs.unavailDueBadge.className = isFirstOfMonth
+    ? "due-badge due-badge--urgent"
+    : "due-badge";
+}
+
+function daysUntilFirst(today) {
+  const nextFirst = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+  return Math.round((nextFirst - today) / 86400000);
+}
+
+function buildUnavailCalendar(year, month) {
+  refs.unavailCalendar.textContent = "";
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  // Only show Fri (5), Sat (6), Sun (0) — operating days
+  const OPERATING_DAYS = new Set([0, 5, 6]); // Sun, Fri, Sat
+  const dayNames = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+
+  // Day-of-week header
+  for (const name of dayNames) {
+    const hdr = document.createElement("span");
+    hdr.className = "cal-header";
+    hdr.textContent = name;
+    refs.unavailCalendar.append(hdr);
+  }
+
+  // Blank leading cells
+  const firstDow = new Date(year, month, 1).getDay();
+  for (let i = 0; i < firstDow; i++) {
+    const blank = document.createElement("span");
+    blank.className = "cal-blank";
+    refs.unavailCalendar.append(blank);
+  }
+
+  // Date cells
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dow = new Date(year, month, d).getDay();
+    const isOperating = OPERATING_DAYS.has(dow);
+
+    const cell = document.createElement("button");
+    cell.type = "button";
+    cell.dataset.date = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+
+    if (isOperating) {
+      cell.className = "cal-day";
+      cell.textContent = d;
+      cell.addEventListener("click", () => cell.classList.toggle("cal-day--selected"));
+    } else {
+      cell.className = "cal-day cal-day--closed";
+      cell.textContent = d;
+      cell.disabled = true;
+      cell.setAttribute("aria-label", "Closed");
+    }
+
+    refs.unavailCalendar.append(cell);
+  }
+}
+
+function submitUnavailability(event) {
+  event.preventDefault();
+
+  const employeeId = refs.unavailEmployee.value;
+  const pin = refs.unavailPin.value.trim();
+  const employee = state.employees.find((e) => e.id === employeeId);
+
+  if (!employee) {
+    showUnavailStatus("Please select your name.", "error");
+    return;
+  }
+
+  if (pin !== employee.pin) {
+    showUnavailStatus("Incorrect PIN. Please try again.", "error");
+    return;
+  }
+
+  const selectedDates = [...refs.unavailCalendar.querySelectorAll(".cal-day--selected")]
+    .map((cell) => {
+      const d = new Date(cell.dataset.date + "T12:00:00");
+      return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+    });
+
+  const notes = refs.unavailNotes.value.trim();
+  const today = new Date();
+  const targetYear = today.getMonth() === 11 ? today.getFullYear() + 1 : today.getFullYear();
+  const targetMonth = (today.getMonth() + 1) % 12;
+  const monthName = new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" })
+    .format(new Date(targetYear, targetMonth, 1));
+
+  const subject = encodeURIComponent(
+    `Unavailability Submission — ${employee.name} — ${monthName}`
+  );
+
+  const body = encodeURIComponent(
+    [
+      `Employee: ${employee.name}`,
+      `Role: ${employee.role}`,
+      `Submitting for: ${monthName}`,
+      `Submitted on: ${today.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}`,
+      "",
+      selectedDates.length
+        ? `Unavailable dates:\n${selectedDates.map((d) => `  • ${d}`).join("\n")}`
+        : "No specific dates selected (fully available).",
+      "",
+      notes ? `Notes:\n${notes}` : ""
+    ]
+      .filter((line) => line !== undefined)
+      .join("\n")
+      .trimEnd()
+  );
+
+  window.location.href = `mailto:${MANAGER_EMAIL}?subject=${subject}&body=${body}`;
+
+  refs.unavailPin.value = "";
+  showUnavailStatus(
+    `Email prepared for ${monthName}. Your mail app should open — hit Send to complete the submission.`,
+    "success"
+  );
+}
+
+function showUnavailStatus(message, type) {
+  refs.unavailStatus.textContent = message;
+  refs.unavailStatus.className = `panel-note unavail-status-msg unavail-status-msg--${type}`;
+}
+
+// ── Firebase backend storage ─────────────────────────────────────────────────
+
+function initFirebase() {
+  if (!FIREBASE_CONFIG.apiKey || !FIREBASE_CONFIG.projectId) {
+    setSyncStatus("local");
+    return;
+  }
+
+  if (typeof window.firebase === "undefined") {
+    setSyncStatus("error");
+    console.error("Firebase SDK is not loaded.");
+    return;
+  }
+
+  try {
+    if (window.firebase.apps.length === 0) {
+      window.firebase.initializeApp(FIREBASE_CONFIG);
+    }
+
+    db = window.firebase.firestore();
+    setSyncStatus("connecting");
+
+    db.collection(FIRESTORE_PATH.collection)
+      .doc(FIRESTORE_PATH.doc)
+      .onSnapshot(
+        (docSnap) => {
+          if (!docSnap.exists) {
+            // First cloud write: push current local state up.
+            pushStateToCloud();
+            return;
+          }
+
+          if (cloudWriteInFlight) {
+            // Ignore immediate echo of this client's own write.
+            return;
+          }
+
+          applyCloudState(docSnap.data());
+          setSyncStatus("synced");
+        },
+        (error) => {
+          setSyncStatus("error");
+          console.error("Firestore listener error:", error);
+        }
+      );
+  } catch (error) {
+    setSyncStatus("error");
+    console.error("Firebase init failed:", error);
+  }
+}
+
+function pushStateToCloud() {
+  if (!db) {
+    return;
+  }
+
+  cloudWriteInFlight = true;
+  setSyncStatus("syncing");
+
+  const payload = { ...state, taskSchemaVersion: TASK_SCHEMA_VERSION };
+  db.collection(FIRESTORE_PATH.collection)
+    .doc(FIRESTORE_PATH.doc)
+    .set(JSON.parse(JSON.stringify(payload)))
+    .then(() => {
+      cloudWriteInFlight = false;
+      setSyncStatus("synced");
+    })
+    .catch((error) => {
+      cloudWriteInFlight = false;
+      setSyncStatus("error");
+      console.error("Firestore write failed:", error);
+    });
+}
+
+function applyCloudState(parsed) {
+  const parsedEmployees = Array.isArray(parsed.employees) ? parsed.employees : [];
+  const employees = createRosterEmployees(parsedEmployees);
+  const useExistingProcedures = parsed.taskSchemaVersion === TASK_SCHEMA_VERSION;
+  const parsedProcedures = useExistingProcedures && Array.isArray(parsed.procedures)
+    ? parsed.procedures
+    : [];
+
+  state.employees = employees;
+  state.entries = Array.isArray(parsed.entries) ? parsed.entries : [];
+  state.procedures = createRoleBasedTasks(employees, parsedProcedures);
+
+  localStorage.setItem(
+    STORAGE_KEY,
+    JSON.stringify({ ...state, taskSchemaVersion: TASK_SCHEMA_VERSION })
+  );
+
+  renderAll();
+}
+
+function setSyncStatus(status) {
+  if (!syncStatusEl) {
+    return;
+  }
+
+  const map = {
+    local: { text: "Local only", className: "sync-badge sync--local" },
+    connecting: { text: "Connecting...", className: "sync-badge sync--connecting" },
+    syncing: { text: "Syncing...", className: "sync-badge sync--syncing" },
+    synced: { text: "Cloud synced", className: "sync-badge sync--synced" },
+    error: { text: "Sync error", className: "sync-badge sync--error" }
+  };
+
+  const next = map[status] ?? map.local;
+  syncStatusEl.textContent = next.text;
+  syncStatusEl.className = next.className;
+}
+
+// ── Storage ──────────────────────────────────────────────────────────────────
+
+function getStoredState() {
+  const current = localStorage.getItem(STORAGE_KEY);
+  if (current) {
+    return current;
+  }
+
+  for (const key of LEGACY_STORAGE_KEYS) {
+    const legacy = localStorage.getItem(key);
+    if (legacy) {
+      return legacy;
+    }
+  }
+
+  return null;
 }

@@ -1,0 +1,10 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Team-shared Arctic Hub state document.
+    // Replace this open rule with authenticated rules before production.
+    match /arctic-hub/state {
+      allow read, write: if true;
+    }
+  }
+}

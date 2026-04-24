@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Northshift | Employee Time & Procedure Hub</title>
+    <title>Arctic Hub | Employee Time & Task Hub</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -19,10 +19,10 @@
     <header class="hero">
       <div class="hero__content">
         <p class="eyebrow">Operations Console</p>
-        <h1>Track shifts. Follow procedures. Stay audit-ready.</h1>
+        <h1>Track shifts. Assign tasks. Stay audit-ready.</h1>
         <p>
-          Northshift helps teams log employee hours and complete critical workplace
-          procedures from one dashboard.
+          Arctic Hub helps teams log employee hours and complete role-based tasks
+          from one dashboard.
         </p>
       </div>
       <div class="hero__meta">
@@ -34,12 +34,17 @@
           <p>Live Clock-ins</p>
           <strong id="liveClockIns">0</strong>
         </div>
+        <div class="meta-card">
+          <p>Cloud Sync</p>
+          <span id="syncStatus" class="sync-badge sync--local">Local only</span>
+        </div>
       </div>
     </header>
 
     <main class="layout">
       <section class="panel">
         <h2>Employee List</h2>
+        <p class="panel-note">Role changes are admin-only. Admin: Michaela Silva (Manager).</p>
         <ul id="employeeList" class="chip-list"></ul>
       </section>
 
@@ -49,6 +54,17 @@
           <label>
             Employee
             <select id="clockEmployee" required></select>
+          </label>
+          <label>
+            Employee PIN
+            <input
+              type="password"
+              id="clockPin"
+              inputmode="numeric"
+              placeholder="Enter your PIN"
+              autocomplete="off"
+              required
+            />
           </label>
           <div class="button-row">
             <button type="button" id="clockInBtn">Clock In</button>
@@ -62,6 +78,28 @@
           <h2>Timesheet Entries</h2>
           <button type="button" id="exportCsvBtn" class="outline">Export CSV</button>
         </div>
+        <div id="adminTimeForm" hidden>
+          <form id="addTimeForm" class="form-grid admin-time-entry">
+            <h3 class="admin-subhead">Add Time Entry</h3>
+            <div class="time-entry-row">
+              <label>
+                Employee
+                <select id="addTimeEmployee" required></select>
+              </label>
+              <label>
+                Clock In
+                <input type="datetime-local" id="addTimeIn" required />
+              </label>
+              <label>
+                Clock Out <span class="optional">(optional)</span>
+                <input type="datetime-local" id="addTimeOut" />
+              </label>
+              <div class="button-row align-end">
+                <button type="submit">Add Entry</button>
+              </div>
+            </div>
+          </form>
+        </div>
         <div class="table-wrap">
           <table>
             <thead>
@@ -71,6 +109,7 @@
                 <th>Clock In</th>
                 <th>Clock Out</th>
                 <th>Total Hours</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody id="entryTableBody"></tbody>
@@ -80,17 +119,28 @@
 
       <section class="panel panel--wide">
         <div class="panel__head">
-          <h2>Procedure Checklist</h2>
-          <form id="procedureForm" class="inline-form">
-            <input
-              type="text"
-              id="procedureInput"
-              maxlength="90"
-              placeholder="Add procedure (e.g. Fire exit inspection)"
-              required
-            />
-            <button type="submit">Add</button>
-          </form>
+          <h2>Role-Based Task Checklist</h2>
+        </div>
+        <p class="panel-note">
+          Tasks are assigned automatically by role. Sign in as admin to update task completion.
+        </p>
+        <div>
+          <div id="adminAuth" class="admin-auth">
+            <label>
+              Admin Passcode
+              <input
+                type="password"
+                id="adminPasscode"
+                placeholder="Enter admin passcode"
+                autocomplete="current-password"
+              />
+            </label>
+            <div class="button-row">
+              <button type="button" id="adminSignInBtn">Admin Sign In</button>
+              <button type="button" id="adminSignOutBtn" class="outline">Admin Sign Out</button>
+            </div>
+            <p id="adminStatus" class="panel-note"></p>
+          </div>
         </div>
         <ul id="procedureList" class="procedure-list"></ul>
       </section>
@@ -98,6 +148,58 @@
       <section class="panel panel--wide">
         <h2>Hours Summary</h2>
         <div id="summaryCards" class="summary-grid"></div>
+      </section>
+
+      <section class="panel panel--wide">
+        <div class="panel__head">
+          <h2>Monthly Unavailability</h2>
+          <span id="unavailDueBadge" class="due-badge"></span>
+        </div>
+        <p class="panel-note">
+          Submit your unavailable dates for the upcoming month. Submissions are due on the
+          <strong>1st of each month</strong> and will be emailed to the manager.
+          We operate <strong>Friday – Sunday</strong>; only those days are selectable below.
+        </p>
+        <form id="unavailForm" class="unavail-form">
+          <div class="unavail-identity">
+            <label>
+              Your Name
+              <select id="unavailEmployee" required></select>
+            </label>
+            <label>
+              Your PIN
+              <input
+                type="password"
+                id="unavailPin"
+                inputmode="numeric"
+                placeholder="Enter your PIN"
+                autocomplete="off"
+                required
+              />
+            </label>
+          </div>
+
+          <fieldset class="unavail-dates-fieldset">
+            <legend>Unavailable dates for <span id="unavailMonthLabel"></span></legend>
+            <p class="panel-note">Select all dates you will be unavailable.</p>
+            <div id="unavailCalendar" class="unavail-calendar"></div>
+          </fieldset>
+
+          <label class="unavail-notes-label">
+            Notes <span class="optional">(optional)</span>
+            <textarea
+              id="unavailNotes"
+              rows="3"
+              maxlength="500"
+              placeholder="e.g. family visit, medical appointment…"
+            ></textarea>
+          </label>
+
+          <div class="button-row">
+            <button type="submit" id="unavailSubmitBtn">Send to Manager</button>
+          </div>
+          <p id="unavailStatus" class="panel-note unavail-status-msg"></p>
+        </form>
       </section>
     </main>
 
@@ -111,6 +213,8 @@
       </li>
     </template>
 
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js" defer></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js" defer></script>
     <script src="app.js" defer></script>
   </body>
 </html>

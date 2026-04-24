@@ -1,6 +1,6 @@
-# Arctic Circle Hub
+# Arctic Hub
 
-Employee time tracking and operational procedure management web app.
+Employee time tracking and role-based task management web app.
 
 ## Features
 
@@ -8,7 +8,13 @@ Employee time tracking and operational procedure management web app.
 - Clock employees in and out
 - Automatic shift entry logging with calculated worked hours
 - Live count of currently clocked-in employees
-- Procedure checklist with complete/remove actions
+- Fixed role-based task assignment for each employee
+- Employee sign-in with PIN required to update their own task completion status
+- Admin sign-in can update task completion for all employees
+- PINs are assigned by employee order starting at 1
+- Chef tasks are fixed to closing and prep-support duties
+- Flex covers both Prep Closing and Service tasks
+- Inventory reminder included for all positions
 - Hours summary by employee
 - CSV export for timesheet entries
 - Local persistence using browser `localStorage`

@@ -106,6 +106,22 @@ body {
   font-size: 1.25rem;
 }
 
+.sync-badge {
+  display: inline-block;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.8rem;
+  font-weight: 500;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+}
+
+.sync--local      { background: var(--ice-50);  border-color: rgba(20,93,116,0.2); color: var(--ice-700); }
+.sync--connecting { background: #fff8e0;         border-color: #e5c300;             color: #7a6100; }
+.sync--syncing    { background: #fff8e0;         border-color: #e5c300;             color: #7a6100; }
+.sync--synced     { background: #e6f9f3;         border-color: #2fa67f;             color: #1a6b51; }
+.sync--error      { background: #fff0f0;         border-color: var(--danger-500);   color: var(--danger-500); }
+
 .layout {
   max-width: 1100px;
   margin: 0 auto 2.5rem;
@@ -130,6 +146,13 @@ body {
 
 .panel h2 {
   margin-top: 0;
+}
+
+.panel-note {
+  margin-top: -0.35rem;
+  margin-bottom: 0.7rem;
+  font-size: 0.86rem;
+  color: rgba(18, 38, 49, 0.72);
 }
 
 .panel__head {
@@ -184,6 +207,13 @@ button:active {
   transform: translateY(0);
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+  transform: none;
+  filter: none;
+}
+
 .outline {
   background: transparent;
   color: var(--ice-700);
@@ -207,6 +237,17 @@ button:active {
   flex-wrap: wrap;
 }
 
+.admin-auth {
+  width: 100%;
+  display: grid;
+  gap: 0.45rem;
+  margin-bottom: 0.7rem;
+  padding: 0.65rem;
+  border: 1px solid rgba(20, 93, 116, 0.2);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.7);
+}
+
 .inline-form input {
   min-width: 260px;
   flex: 1;
@@ -222,15 +263,79 @@ button:active {
 }
 
 .chip-list li {
-  display: inline-flex;
-  gap: 0.45rem;
+  display: flex;
+  gap: 0.55rem;
   align-items: center;
-  width: fit-content;
-  max-width: 100%;
+  width: 100%;
   border: 1px solid rgba(20, 93, 116, 0.2);
-  border-radius: 999px;
-  padding: 0.25rem 0.65rem;
+  border-radius: 12px;
+  padding: 0.45rem 0.65rem;
   background: #ffffff;
+  flex-wrap: wrap;
+}
+
+.employee-item span:first-child {
+  margin-right: auto;
+}
+
+.admin-badge {
+  border: 1px solid rgba(20, 93, 116, 0.3);
+  border-radius: 999px;
+  padding: 0.18rem 0.5rem;
+  font-size: 0.78rem;
+  color: var(--ice-700);
+  background: var(--ice-50);
+}
+
+.role-select {
+  width: auto;
+  min-width: 110px;
+}
+
+.role-btn {
+  padding: 0.4rem 0.65rem;
+}
+
+.pin-input {
+  width: 70px;
+  min-width: unset;
+  text-align: center;
+}
+
+.admin-subhead {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+  color: var(--ice-700);
+}
+
+.optional {
+  font-size: 0.8rem;
+  color: rgba(18, 38, 49, 0.55);
+  font-weight: 400;
+}
+
+.time-entry-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-end;
+}
+
+.time-entry-row label {
+  flex: 1;
+  min-width: 160px;
+}
+
+.align-end {
+  align-self: flex-end;
+}
+
+.admin-time-entry {
+  border: 1px solid rgba(20, 93, 116, 0.2);
+  border-radius: 12px;
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.7);
+  margin-bottom: 0.75rem;
 }
 
 .procedure-item {
@@ -304,6 +409,143 @@ th:last-child {
   margin-top: 0.2rem;
   font-size: 1.1rem;
   color: var(--ice-700);
+}
+
+/* ── Unavailability form ─────────────────────────────────────────── */
+
+.due-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  border: 1px solid rgba(20, 93, 116, 0.3);
+  background: var(--ice-50);
+  color: var(--ice-700);
+}
+
+.due-badge--urgent {
+  background: #fff4e0;
+  border-color: #f28f3b;
+  color: #b85e00;
+}
+
+.unavail-form {
+  display: grid;
+  gap: 1rem;
+}
+
+.unavail-identity {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.unavail-identity label {
+  flex: 1;
+  min-width: 180px;
+}
+
+.unavail-dates-fieldset {
+  border: 1px solid rgba(20, 93, 116, 0.2);
+  border-radius: 12px;
+  padding: 0.75rem 0.9rem 0.9rem;
+  margin: 0;
+}
+
+.unavail-dates-fieldset legend {
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 0 0.35rem;
+  color: var(--ice-700);
+}
+
+.unavail-calendar {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin-top: 0.5rem;
+}
+
+.cal-header {
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: rgba(18, 38, 49, 0.5);
+  padding-bottom: 0.2rem;
+}
+
+.cal-blank {
+  /* empty spacer */
+}
+
+.cal-day {
+  aspect-ratio: 1;
+  border-radius: 8px;
+  border: 1px solid rgba(20, 93, 116, 0.18);
+  background: #fff;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--slate-900);
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+  padding: 0;
+}
+
+.cal-day:hover {
+  background: var(--ice-100);
+  border-color: var(--ice-300);
+  transform: none;
+  filter: none;
+}
+
+.cal-day--selected {
+  background: var(--ice-700);
+  border-color: var(--ice-700);
+  color: #ffffff;
+}
+
+.cal-day--selected:hover {
+  background: #0f4a5e;
+  border-color: #0f4a5e;
+}
+
+.cal-day--closed {
+  background: transparent;
+  border-color: transparent;
+  color: rgba(18, 38, 49, 0.22);
+  cursor: default;
+  pointer-events: none;
+}
+
+.unavail-notes-label {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.92rem;
+}
+
+.unavail-notes-label textarea {
+  font: inherit;
+  border: 1px solid rgba(18, 38, 49, 0.25);
+  border-radius: 10px;
+  padding: 0.6rem 0.7rem;
+  background: #fff;
+  resize: vertical;
+}
+
+.unavail-status-msg {
+  min-height: 1.2em;
+  margin-top: 0;
+}
+
+.unavail-status-msg--success {
+  color: var(--mint-500);
+}
+
+.unavail-status-msg--error {
+  color: var(--danger-500);
 }
 
 @keyframes rise {
