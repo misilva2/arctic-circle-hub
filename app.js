@@ -108,7 +108,6 @@ const refs = {
   unavailNotes: document.getElementById("unavailNotes"),
   unavailSubmitBtn: document.getElementById("unavailSubmitBtn"),
   unavailStatus: document.getElementById("unavailStatus"),
-  unavailDueBadge: document.getElementById("unavailDueBadge"),
   leaderboardList: document.getElementById("leaderboardList"),
   adminScheduleForm: document.getElementById("adminScheduleForm"),
   scheduleForm: document.getElementById("scheduleForm"),
@@ -1288,14 +1287,6 @@ function renderUnavailForm() {
     buildUnavailCalendar(targetYear, targetMonth);
   }
 
-  // Due-date badge
-  const isFirstOfMonth = today.getDate() === 1;
-  refs.unavailDueBadge.textContent = isFirstOfMonth
-    ? "Due today!"
-    : `Due on the 1st (${daysUntilFirst(today)} day${daysUntilFirst(today) === 1 ? "" : "s"} away)`;
-  refs.unavailDueBadge.className = isFirstOfMonth
-    ? "due-badge due-badge--urgent"
-    : "due-badge";
 }
 
 function daysUntilFirst(today) {

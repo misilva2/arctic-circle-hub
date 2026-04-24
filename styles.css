@@ -484,6 +484,10 @@ th:last-child {
   z-index: 100;
 }
 
+.celebration-modal[hidden] {
+  display: none;
+}
+
 .celebration-modal__card {
   width: min(520px, 100%);
   border-radius: 18px;
