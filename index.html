@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Northshift | Employee Time & Procedure Hub</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="aurora aurora-one" aria-hidden="true"></div>
+    <div class="aurora aurora-two" aria-hidden="true"></div>
+
+    <header class="hero">
+      <div class="hero__content">
+        <p class="eyebrow">Operations Console</p>
+        <h1>Track shifts. Follow procedures. Stay audit-ready.</h1>
+        <p>
+          Northshift helps teams log employee hours and complete critical workplace
+          procedures from one dashboard.
+        </p>
+      </div>
+      <div class="hero__meta">
+        <div class="meta-card">
+          <p>Today</p>
+          <strong id="todayDate"></strong>
+        </div>
+        <div class="meta-card">
+          <p>Live Clock-ins</p>
+          <strong id="liveClockIns">0</strong>
+        </div>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="panel">
+        <h2>Add Employee</h2>
+        <form id="employeeForm" class="form-grid">
+          <label>
+            Full Name
+            <input type="text" id="employeeName" required maxlength="60" />
+          </label>
+          <label>
+            Role
+            <input type="text" id="employeeRole" required maxlength="40" />
+          </label>
+          <button type="submit">Save Employee</button>
+        </form>
+        <ul id="employeeList" class="chip-list"></ul>
+      </section>
+
+      <section class="panel">
+        <h2>Clock In / Clock Out</h2>
+        <form id="clockForm" class="form-grid">
+          <label>
+            Employee
+            <select id="clockEmployee" required></select>
+          </label>
+          <div class="button-row">
+            <button type="button" id="clockInBtn">Clock In</button>
+            <button type="button" id="clockOutBtn" class="outline">Clock Out</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="panel panel--wide">
+        <div class="panel__head">
+          <h2>Timesheet Entries</h2>
+          <button type="button" id="exportCsvBtn" class="outline">Export CSV</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Employee</th>
+                <th>Role</th>
+                <th>Clock In</th>
+                <th>Clock Out</th>
+                <th>Total Hours</th>
+              </tr>
+            </thead>
+            <tbody id="entryTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel panel--wide">
+        <div class="panel__head">
+          <h2>Procedure Checklist</h2>
+          <form id="procedureForm" class="inline-form">
+            <input
+              type="text"
+              id="procedureInput"
+              maxlength="90"
+              placeholder="Add procedure (e.g. Fire exit inspection)"
+              required
+            />
+            <button type="submit">Add</button>
+          </form>
+        </div>
+        <ul id="procedureList" class="procedure-list"></ul>
+      </section>
+
+      <section class="panel panel--wide">
+        <h2>Hours Summary</h2>
+        <div id="summaryCards" class="summary-grid"></div>
+      </section>
+    </main>
+
+    <template id="procedureTemplate">
+      <li class="procedure-item">
+        <label>
+          <input type="checkbox" />
+          <span class="procedure-text"></span>
+        </label>
+        <button type="button" class="text-btn">Remove</button>
+      </li>
+    </template>
+
+    <script src="app.js" defer></script>
+  </body>
+</html>
