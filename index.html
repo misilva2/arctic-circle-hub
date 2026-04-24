@@ -119,10 +119,10 @@
 
       <section class="panel panel--wide">
         <div class="panel__head">
-          <h2>Role-Based Task Checklist</h2>
+          <h2>Task Checklist</h2>
         </div>
         <p class="panel-note">
-          Tasks are assigned by role, and admins can assign extra tasks in Settings.
+          Tasks are created by admins in Settings and assigned to employees.
           Employees can only update their own tasks after PIN sign-in.
         </p>
         <div>
@@ -211,6 +211,27 @@
                 <button type="submit">Assign Task</button>
               </div>
             </div>
+            <p class="panel-note">Assigned tasks are automatically saved for reuse.</p>
+          </form>
+
+          <form id="applySavedTaskForm" class="form-grid admin-time-entry">
+            <h3 class="admin-subhead">Saved Tasks</h3>
+            <div class="time-entry-row">
+              <label>
+                Saved Task
+                <select id="savedTaskSelect" required></select>
+              </label>
+              <label>
+                Apply To Employees
+                <select id="savedTaskEmployees" multiple size="5" required></select>
+              </label>
+              <div class="button-row align-end">
+                <button type="submit">Apply Saved Task</button>
+                <button type="button" id="editSavedTaskBtn" class="outline">Edit Saved Task</button>
+                <button type="button" id="deleteSavedTaskBtn" class="outline">Delete Saved Task</button>
+              </div>
+            </div>
+            <p class="panel-note">Hold Ctrl/Cmd to select multiple employees.</p>
           </form>
 
           <div class="admin-time-entry">

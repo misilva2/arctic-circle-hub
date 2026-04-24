@@ -1,6 +1,6 @@
 const STORAGE_KEY = "arctic-hub-state-v4";
 const LEGACY_STORAGE_KEYS = ["arctic-hub-state-v3", "arctic-hub-state-v2", "northshift-state-v1"];
-const TASK_SCHEMA_VERSION = 3;
+const TASK_SCHEMA_VERSION = 4;
 
 // ── Firebase Cloud Sync ───────────────────────────────────────────────────────
 // To enable real-time sync across all devices:
@@ -116,6 +116,11 @@ const refs = {
   assignTaskEmployee: document.getElementById("assignTaskEmployee"),
   assignTaskText: document.getElementById("assignTaskText"),
   assignTaskXp: document.getElementById("assignTaskXp"),
+  applySavedTaskForm: document.getElementById("applySavedTaskForm"),
+  savedTaskSelect: document.getElementById("savedTaskSelect"),
+  savedTaskEmployees: document.getElementById("savedTaskEmployees"),
+  editSavedTaskBtn: document.getElementById("editSavedTaskBtn"),
+  deleteSavedTaskBtn: document.getElementById("deleteSavedTaskBtn"),
   taskEmployee: document.getElementById("taskEmployee"),
   taskPin: document.getElementById("taskPin"),
   taskSignInBtn: document.getElementById("taskSignInBtn"),
@@ -161,6 +166,10 @@ function bindEvents() {
   refs.scheduleForm.addEventListener("submit", addScheduleEntry);
   refs.xpConfigForm.addEventListener("submit", saveXpConfig);
   refs.assignTaskForm.addEventListener("submit", addAssignedTask);
+  refs.applySavedTaskForm.addEventListener("submit", applySavedTaskToEmployees);
+  refs.savedTaskSelect.addEventListener("change", updateSavedTaskActionButtons);
+  refs.editSavedTaskBtn.addEventListener("click", editSavedTaskTemplate);
+  refs.deleteSavedTaskBtn.addEventListener("click", deleteSavedTask);
   refs.closeCelebrationBtn.addEventListener("click", closeCelebration);
   refs.adminSignInBtn.addEventListener("click", signInAdmin);
   refs.taskSignInBtn.addEventListener("click", signInTaskEmployee);
@@ -391,6 +400,8 @@ function renderAdminSettings() {
 
   renderSettingsEmployeeOptions();
   renderAssignTaskEmployeeOptions();
+  renderSavedTaskOptions();
+  renderSavedTaskEmployeeOptions();
   renderXpConfig();
 }
 
@@ -477,6 +488,49 @@ function renderAssignTaskEmployeeOptions() {
 
   const hasCurrent = state.employees.some((employee) => employee.id === current);
   refs.assignTaskEmployee.value = hasCurrent ? current : "";
+}
+
+function renderSavedTaskOptions() {
+  const current = refs.savedTaskSelect.value;
+  refs.savedTaskSelect.textContent = "";
+
+  const emptyOption = document.createElement("option");
+  emptyOption.value = "";
+  emptyOption.textContent = state.savedTasks.length
+    ? "Select saved task"
+    : "No saved tasks yet";
+  refs.savedTaskSelect.append(emptyOption);
+
+  const sorted = [...state.savedTasks].sort((a, b) => a.text.localeCompare(b.text));
+  for (const task of sorted) {
+    const option = document.createElement("option");
+    option.value = task.id;
+    option.textContent = `${task.text} (${task.xpValue} XP)`;
+    refs.savedTaskSelect.append(option);
+  }
+
+  const hasCurrent = state.savedTasks.some((task) => task.id === current);
+  refs.savedTaskSelect.value = hasCurrent ? current : "";
+  updateSavedTaskActionButtons();
+}
+
+function updateSavedTaskActionButtons() {
+  const hasSelection = Boolean(refs.savedTaskSelect.value);
+  refs.editSavedTaskBtn.disabled = !hasSelection;
+  refs.deleteSavedTaskBtn.disabled = !hasSelection;
+}
+
+function renderSavedTaskEmployeeOptions() {
+  const selected = new Set(Array.from(refs.savedTaskEmployees.selectedOptions).map((opt) => opt.value));
+  refs.savedTaskEmployees.textContent = "";
+
+  for (const employee of state.employees) {
+    const option = document.createElement("option");
+    option.value = employee.id;
+    option.textContent = employee.name;
+    option.selected = selected.has(employee.id);
+    refs.savedTaskEmployees.append(option);
+  }
 }
 
 function renderClockEmployeeOptions() {
@@ -967,20 +1021,174 @@ function addAssignedTask(event) {
     return;
   }
 
+  const added = addCustomTaskForEmployee(employee.id, text, Math.round(xpValue));
+  if (!added) {
+    window.alert("This employee already has that task assigned.");
+    return;
+  }
+
+  saveTaskTemplate(text, Math.round(xpValue));
+
+  refs.assignTaskForm.reset();
+  persistAndRender();
+}
+
+function applySavedTaskToEmployees(event) {
+  event.preventDefault();
+  if (!session.isAdminSignedIn) {
+    return;
+  }
+
+  const taskId = refs.savedTaskSelect.value;
+  const employeeIds = Array.from(refs.savedTaskEmployees.selectedOptions).map((opt) => opt.value);
+
+  if (!taskId) {
+    window.alert("Select a saved task.");
+    return;
+  }
+
+  if (employeeIds.length === 0) {
+    window.alert("Select at least one employee.");
+    return;
+  }
+
+  const savedTask = state.savedTasks.find((task) => task.id === taskId);
+  if (!savedTask) {
+    window.alert("Saved task not found.");
+    return;
+  }
+
+  let addedCount = 0;
+  for (const employeeId of employeeIds) {
+    if (addCustomTaskForEmployee(employeeId, savedTask.text, savedTask.xpValue)) {
+      addedCount += 1;
+    }
+  }
+
+  if (addedCount === 0) {
+    window.alert("Selected employees already have this task.");
+    return;
+  }
+
+  persistAndRender();
+}
+
+function deleteSavedTask() {
+  if (!session.isAdminSignedIn) {
+    return;
+  }
+
+  const taskId = refs.savedTaskSelect.value;
+  if (!taskId) {
+    window.alert("Select a saved task to delete.");
+    return;
+  }
+
+  state.savedTasks = state.savedTasks.filter((task) => task.id !== taskId);
+  persistAndRender();
+}
+
+function editSavedTaskTemplate() {
+  if (!session.isAdminSignedIn) {
+    return;
+  }
+
+  const taskId = refs.savedTaskSelect.value;
+  if (!taskId) {
+    window.alert("Select a saved task to edit.");
+    return;
+  }
+
+  const template = state.savedTasks.find((task) => task.id === taskId);
+  if (!template) {
+    window.alert("Saved task not found.");
+    return;
+  }
+
+  const nextTextInput = window.prompt("Update saved task text:", template.text);
+  if (nextTextInput === null) {
+    return;
+  }
+
+  const nextText = nextTextInput.trim();
+  if (!nextText) {
+    window.alert("Task text cannot be empty.");
+    return;
+  }
+
+  const nextXpInput = window.prompt("Update saved task XP:", String(template.xpValue));
+  if (nextXpInput === null) {
+    return;
+  }
+
+  const nextXp = Number(nextXpInput);
+  if (!Number.isFinite(nextXp) || nextXp <= 0) {
+    window.alert("XP must be greater than 0.");
+    return;
+  }
+
+  const duplicateByText = state.savedTasks.find((task) => {
+    return task.id !== template.id && task.text.trim().toLowerCase() === nextText.toLowerCase();
+  });
+
+  if (duplicateByText) {
+    duplicateByText.xpValue = Math.round(nextXp);
+    state.savedTasks = state.savedTasks.filter((task) => task.id !== template.id);
+  } else {
+    template.text = nextText;
+    template.xpValue = Math.round(nextXp);
+  }
+
+  persistAndRender();
+}
+
+function addCustomTaskForEmployee(employeeId, text, xpValue) {
+  const employee = state.employees.find((item) => item.id === employeeId);
+  if (!employee) {
+    return false;
+  }
+
+  const normalizedText = text.trim();
+  const alreadyAssigned = state.procedures.some((task) => {
+    return task.employeeId === employee.id && task.text.trim().toLowerCase() === normalizedText.toLowerCase();
+  });
+
+  if (alreadyAssigned) {
+    return false;
+  }
+
   state.procedures.push({
     id: crypto.randomUUID(),
-    text,
+    text: normalizedText,
     done: false,
-    employeeId,
+    employeeId: employee.id,
     role: employee.role,
     custom: true,
-    xpValue: Math.round(xpValue),
+    xpValue,
     xpAwarded: false,
     completedAt: null
   });
 
-  refs.assignTaskForm.reset();
-  persistAndRender();
+  return true;
+}
+
+function saveTaskTemplate(text, xpValue) {
+  const normalizedText = text.trim();
+  const existing = state.savedTasks.find(
+    (task) => task.text.trim().toLowerCase() === normalizedText.toLowerCase()
+  );
+
+  if (existing) {
+    existing.text = normalizedText;
+    existing.xpValue = xpValue;
+    return;
+  }
+
+  state.savedTasks.push({
+    id: crypto.randomUUID(),
+    text: normalizedText,
+    xpValue
+  });
 }
 
 function removeProcedure(procedureId) {
@@ -1325,10 +1533,14 @@ function loadState() {
     const parsedProcedures = useExistingProcedures && Array.isArray(parsed.procedures)
       ? parsed.procedures
       : [];
+    const parsedSavedTasks = useExistingProcedures && Array.isArray(parsed.savedTasks)
+      ? parsed.savedTasks
+      : [];
     return {
       employees,
       entries: Array.isArray(parsed.entries) ? parsed.entries : [],
       procedures: createRoleBasedTasks(employees, parsedProcedures),
+      savedTasks: normalizeSavedTasks(parsedSavedTasks, parsedProcedures),
       schedule: Array.isArray(parsed.schedule) ? parsed.schedule : [],
       xpEvents: Array.isArray(parsed.xpEvents) ? parsed.xpEvents : [],
       lastCelebrationWeekKey: parsed.lastCelebrationWeekKey ?? null,
@@ -1378,26 +1590,16 @@ function changeEmployeeRole(employeeId, nextRole) {
 }
 
 function reassignEmployeeRoleTasks(employeeId, nextRole) {
-  const existingGeneratedTasks = state.procedures.filter(
-    (task) => task.employeeId === employeeId && !task.custom
-  );
-  const doneByText = new Map(existingGeneratedTasks.map((task) => [task.text, task.done]));
+  state.procedures = state.procedures.map((task) => {
+    if (task.employeeId !== employeeId) {
+      return task;
+    }
 
-  state.procedures = state.procedures.filter((task) => task.employeeId !== employeeId || task.custom);
-
-  const nextTasks = getTasksForRole(nextRole).map((text) => ({
-    id: crypto.randomUUID(),
-    text,
-    done: doneByText.get(text) ?? false,
-    employeeId,
-    role: nextRole,
-    custom: false,
-    xpValue: null,
-    xpAwarded: false,
-    completedAt: null
-  }));
-
-  state.procedures.push(...nextTasks);
+    return {
+      ...task,
+      role: nextRole
+    };
+  });
 }
 
 function createDefaultState() {
@@ -1405,7 +1607,8 @@ function createDefaultState() {
   return {
     employees,
     entries: [],
-    procedures: createRoleBasedTasks(employees),
+    procedures: [],
+    savedTasks: [],
     schedule: [],
     xpEvents: [],
     lastCelebrationWeekKey: null,
@@ -1428,6 +1631,45 @@ function normalizeXpConfig(config) {
   }
 
   return merged;
+}
+
+function normalizeSavedTasks(savedTasks = [], procedures = []) {
+  const sources = [];
+
+  if (Array.isArray(savedTasks)) {
+    sources.push(...savedTasks);
+  }
+
+  if (sources.length === 0 && Array.isArray(procedures)) {
+    for (const procedure of procedures) {
+      if (typeof procedure?.text !== "string") {
+        continue;
+      }
+      sources.push({
+        id: procedure.id,
+        text: procedure.text,
+        xpValue: procedure.xpValue
+      });
+    }
+  }
+
+  const byText = new Map();
+  for (const task of sources) {
+    const text = String(task?.text ?? "").trim();
+    if (!text) {
+      continue;
+    }
+
+    const xpRaw = Number(task?.xpValue);
+    const xpValue = Number.isFinite(xpRaw) && xpRaw > 0 ? Math.round(xpRaw) : TASK_XP_DEFAULT;
+    byText.set(text.toLowerCase(), {
+      id: typeof task?.id === "string" ? task.id : crypto.randomUUID(),
+      text,
+      xpValue
+    });
+  }
+
+  return Array.from(byText.values()).sort((a, b) => a.text.localeCompare(b.text));
 }
 
 function createRosterEmployees(existingEmployees = []) {
@@ -1475,6 +1717,7 @@ function getHourlyRate() {
 }
 
 function createRoleBasedTasks(employees, existingProcedures = []) {
+  const employeeById = new Map(employees.map((employee) => [employee.id, employee]));
   const normalizedExisting = existingProcedures.map((task) => ({
     id: task.id,
     text: task.text,
@@ -1487,53 +1730,25 @@ function createRoleBasedTasks(employees, existingProcedures = []) {
     completedAt: task.completedAt ?? null
   }));
 
-  const tasks = [];
-
-  for (const employee of employees) {
-    const employeeExisting = normalizedExisting.filter(
-      (task) => task.employeeId === employee.id
-    );
-    const generatedByText = new Map(
-      employeeExisting
-        .filter((task) => !task.custom)
-        .map((task) => [task.text, task])
-    );
-
-    for (const text of getTasksForRole(employee.role)) {
-      const existing = generatedByText.get(text);
-      tasks.push({
-        id: existing?.id ?? crypto.randomUUID(),
-        text,
-        done: existing?.done ?? false,
-        employeeId: employee.id,
-        role: employee.role,
-        custom: false,
-        xpValue: null,
-        xpAwarded: existing?.xpAwarded ?? false,
-        completedAt: existing?.completedAt ?? null
-      });
-    }
-
-    for (const customTask of employeeExisting.filter((task) => task.custom)) {
-      tasks.push({
-        id: customTask.id ?? crypto.randomUUID(),
-        text: customTask.text,
-        done: customTask.done,
-        employeeId: employee.id,
-        role: employee.role,
+  return normalizedExisting
+    .filter((task) => {
+      const owner = employeeById.get(task.employeeId);
+      return owner && typeof task.text === "string" && task.text.trim().length > 0;
+    })
+    .map((task) => {
+      const owner = employeeById.get(task.employeeId);
+      return {
+        id: task.id ?? crypto.randomUUID(),
+        text: task.text.trim(),
+        done: task.done,
+        employeeId: task.employeeId,
+        role: owner.role,
         custom: true,
-        xpValue: customTask.xpValue,
-        xpAwarded: customTask.xpAwarded,
-        completedAt: customTask.completedAt
-      });
-    }
-  }
-
-  return tasks;
-}
-
-function getTasksForRole(role) {
-  return ROLE_TASKS[role] ?? ROLE_TASKS.Service;
+        xpValue: task.xpValue,
+        xpAwarded: task.xpAwarded,
+        completedAt: task.completedAt
+      };
+    });
 }
 
 // ── Unavailability ──────────────────────────────────────────────────────────
@@ -1777,10 +1992,14 @@ function applyCloudState(parsed) {
   const parsedProcedures = useExistingProcedures && Array.isArray(parsed.procedures)
     ? parsed.procedures
     : [];
+  const parsedSavedTasks = useExistingProcedures && Array.isArray(parsed.savedTasks)
+    ? parsed.savedTasks
+    : [];
 
   state.employees = employees;
   state.entries = Array.isArray(parsed.entries) ? parsed.entries : [];
   state.procedures = createRoleBasedTasks(employees, parsedProcedures);
+  state.savedTasks = normalizeSavedTasks(parsedSavedTasks, parsedProcedures);
   state.schedule = Array.isArray(parsed.schedule) ? parsed.schedule : [];
   state.xpEvents = Array.isArray(parsed.xpEvents) ? parsed.xpEvents : [];
   state.lastCelebrationWeekKey = parsed.lastCelebrationWeekKey ?? null;

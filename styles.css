@@ -1,16 +1,16 @@
 :root {
-  --ice-50: #eef7fb;
-  --ice-100: #d7edf7;
-  --ice-300: #8fc8dc;
-  --ice-700: #145d74;
-  --slate-900: #122631;
-  --mint-500: #2fa67f;
-  --amber-500: #f28f3b;
-  --danger-500: #d64545;
-  --paper: #f8fcff;
-  --panel: rgba(255, 255, 255, 0.82);
-  --shadow: 0 16px 45px rgba(17, 54, 76, 0.16);
-  --radius: 20px;
+  --ice-50: #f2f5fb;
+  --ice-100: #e3ebf7;
+  --ice-300: #b8c9e8;
+  --ice-700: #0f2748;
+  --slate-900: #0b1f3a;
+  --mint-500: #c21f3a;
+  --amber-500: #d98d23;
+  --danger-500: #b5112f;
+  --paper: #ffffff;
+  --panel: rgba(255, 255, 255, 0.94);
+  --shadow: 0 18px 40px rgba(9, 27, 56, 0.14);
+  --radius: 18px;
 }
 
 * {
@@ -21,7 +21,11 @@ body {
   margin: 0;
   font-family: "Space Grotesk", sans-serif;
   color: var(--slate-900);
-  background: radial-gradient(circle at 0% 0%, #d8f2ff 0%, #f4fcff 45%, #fffef9 100%);
+  line-height: 1.45;
+  background:
+    radial-gradient(circle at 8% -5%, rgba(194, 31, 58, 0.16) 0%, rgba(194, 31, 58, 0) 42%),
+    radial-gradient(circle at 96% 0%, rgba(15, 39, 72, 0.2) 0%, rgba(15, 39, 72, 0) 38%),
+    linear-gradient(175deg, #f6f8fd 0%, #ffffff 58%, #f3f6fc 100%);
   min-height: 100vh;
   position: relative;
   overflow-x: hidden;
@@ -41,29 +45,30 @@ body {
 .aurora-one {
   top: -8rem;
   left: -6rem;
-  background: #9de0f8;
+  background: rgba(194, 31, 58, 0.34);
 }
 
 .aurora-two {
   right: -7rem;
   bottom: -8rem;
-  background: #ffe0c2;
+  background: rgba(15, 39, 72, 0.26);
 }
 
 .hero {
-  padding: 2.5rem 2rem 1rem;
+  padding: 2.75rem 2rem 1.2rem;
   max-width: 1100px;
   margin: 0 auto;
   display: grid;
-  gap: 1rem;
+  gap: 1.25rem;
   grid-template-columns: 2fr 1fr;
   animation: rise 450ms ease-out both;
 }
 
 .hero__content h1 {
   margin: 0.25rem 0 0.5rem;
-  font-size: clamp(1.8rem, 3.8vw, 3.2rem);
+  font-size: clamp(1.9rem, 3.8vw, 3.3rem);
   line-height: 1.1;
+  letter-spacing: -0.02em;
 }
 
 .hero__content p {
@@ -73,11 +78,13 @@ body {
 
 .eyebrow {
   display: inline-flex;
-  background: var(--ice-100);
-  border: 1px solid var(--ice-300);
+  background: #f8e8eb;
+  border: 1px solid #e9b0bc;
   border-radius: 999px;
-  padding: 0.25rem 0.75rem;
+  padding: 0.28rem 0.8rem;
   font-size: 0.8rem;
+  color: #8b0f29;
+  font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -89,10 +96,10 @@ body {
 
 .meta-card {
   background: var(--panel);
-  border: 1px solid rgba(20, 93, 116, 0.2);
+  border: 1px solid rgba(15, 39, 72, 0.14);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  padding: 1rem;
+  padding: 1rem 1.05rem;
 }
 
 .meta-card p {
@@ -103,7 +110,7 @@ body {
 
 .meta-card strong {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 1.25rem;
+  font-size: 1.32rem;
 }
 
 .sync-badge {
@@ -128,15 +135,15 @@ body {
   padding: 0 2rem;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1rem;
+  gap: 1.15rem;
 }
 
 .panel {
   background: var(--panel);
-  border: 1px solid rgba(20, 93, 116, 0.18);
+  border: 1px solid rgba(15, 39, 72, 0.12);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  padding: 1rem;
+  padding: 1.18rem;
   animation: rise 520ms ease-out both;
 }
 
@@ -146,13 +153,15 @@ body {
 
 .panel h2 {
   margin-top: 0;
+  margin-bottom: 0.65rem;
+  letter-spacing: -0.01em;
 }
 
 .panel-note {
-  margin-top: -0.35rem;
-  margin-bottom: 0.7rem;
-  font-size: 0.86rem;
-  color: rgba(18, 38, 49, 0.72);
+  margin-top: -0.2rem;
+  margin-bottom: 0.82rem;
+  font-size: 0.88rem;
+  color: rgba(11, 31, 58, 0.68);
 }
 
 .panel__head {
@@ -164,13 +173,14 @@ body {
 
 .form-grid {
   display: grid;
-  gap: 0.75rem;
+  gap: 0.95rem;
 }
 
 label {
   display: grid;
-  gap: 0.35rem;
-  font-size: 0.92rem;
+  gap: 0.4rem;
+  font-size: 0.93rem;
+  font-weight: 500;
 }
 
 input,
@@ -181,26 +191,31 @@ button {
 
 input,
 select {
-  border: 1px solid rgba(18, 38, 49, 0.25);
-  border-radius: 10px;
-  padding: 0.6rem 0.7rem;
+  border: 1px solid rgba(15, 39, 72, 0.28);
+  border-radius: 11px;
+  padding: 0.68rem 0.78rem;
+  min-height: 44px;
   background: #ffffff;
+  color: var(--slate-900);
 }
 
 button {
   border: none;
-  border-radius: 12px;
-  padding: 0.6rem 0.9rem;
+  border-radius: 11px;
+  padding: 0.68rem 1rem;
+  min-height: 44px;
   background: var(--mint-500);
   color: #ffffff;
   font-weight: 600;
+  letter-spacing: 0.01em;
   cursor: pointer;
-  transition: transform 150ms ease, filter 150ms ease;
+  transition: transform 130ms ease, filter 130ms ease, box-shadow 130ms ease;
 }
 
 button:hover {
   transform: translateY(-1px);
-  filter: brightness(1.04);
+  filter: brightness(1.03);
+  box-shadow: 0 10px 18px rgba(194, 31, 58, 0.24);
 }
 
 button:active {
@@ -217,18 +232,24 @@ button:disabled {
 .outline {
   background: transparent;
   color: var(--ice-700);
-  border: 1px solid rgba(20, 93, 116, 0.35);
+  border: 1px solid rgba(15, 39, 72, 0.42);
 }
 
 .text-btn {
   background: transparent;
   color: var(--danger-500);
-  padding: 0.2rem 0.45rem;
+  padding: 0.3rem 0.5rem;
+  box-shadow: none;
 }
 
 .button-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
+}
+
+.button-row button {
+  min-width: 132px;
 }
 
 .inline-form {
@@ -240,12 +261,12 @@ button:disabled {
 .admin-auth {
   width: 100%;
   display: grid;
-  gap: 0.45rem;
+  gap: 0.55rem;
   margin-bottom: 0.7rem;
-  padding: 0.65rem;
-  border: 1px solid rgba(20, 93, 116, 0.2);
+  padding: 0.8rem;
+  border: 1px solid rgba(15, 39, 72, 0.15);
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.86);
 }
 
 .inline-form input {
@@ -267,9 +288,9 @@ button:disabled {
   gap: 0.55rem;
   align-items: center;
   width: 100%;
-  border: 1px solid rgba(20, 93, 116, 0.2);
+  border: 1px solid rgba(15, 39, 72, 0.14);
   border-radius: 12px;
-  padding: 0.45rem 0.65rem;
+  padding: 0.62rem 0.74rem;
   background: #ffffff;
   flex-wrap: wrap;
 }
@@ -279,12 +300,12 @@ button:disabled {
 }
 
 .admin-badge {
-  border: 1px solid rgba(20, 93, 116, 0.3);
+  border: 1px solid rgba(15, 39, 72, 0.28);
   border-radius: 999px;
-  padding: 0.18rem 0.5rem;
+  padding: 0.2rem 0.56rem;
   font-size: 0.78rem;
   color: var(--ice-700);
-  background: var(--ice-50);
+  background: #eef3fb;
 }
 
 .role-select {
@@ -304,13 +325,13 @@ button:disabled {
 
 .admin-subhead {
   margin: 0 0 0.5rem;
-  font-size: 0.95rem;
+  font-size: 1rem;
   color: var(--ice-700);
 }
 
 .optional {
   font-size: 0.8rem;
-  color: rgba(18, 38, 49, 0.55);
+  color: rgba(11, 31, 58, 0.56);
   font-weight: 400;
 }
 
@@ -331,21 +352,21 @@ button:disabled {
 }
 
 .admin-time-entry {
-  border: 1px solid rgba(20, 93, 116, 0.2);
+  border: 1px solid rgba(15, 39, 72, 0.15);
   border-radius: 12px;
-  padding: 0.75rem;
-  background: rgba(255, 255, 255, 0.7);
+  padding: 0.95rem;
+  background: rgba(255, 255, 255, 0.88);
   margin-bottom: 0.75rem;
 }
 
 .procedure-item {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 0.75rem;
-  border: 1px solid rgba(20, 93, 116, 0.2);
+  gap: 0.9rem;
+  border: 1px solid rgba(15, 39, 72, 0.14);
   border-radius: 12px;
-  padding: 0.5rem 0.6rem;
+  padding: 0.65rem 0.72rem;
   background: #ffffff;
 }
 
@@ -356,12 +377,12 @@ button:disabled {
 }
 
 .procedure-item input[type="checkbox"] {
-  accent-color: var(--mint-500);
+  accent-color: #c21f3a;
 }
 
 .procedure-item.done .procedure-text {
   text-decoration: line-through;
-  color: rgba(18, 38, 49, 0.55);
+  color: rgba(11, 31, 58, 0.55);
 }
 
 .table-wrap {
@@ -377,8 +398,19 @@ table {
 th,
 td {
   text-align: left;
-  padding: 0.55rem 0.35rem;
-  border-bottom: 1px solid rgba(18, 38, 49, 0.12);
+  padding: 0.65rem 0.38rem;
+  border-bottom: 1px solid rgba(15, 39, 72, 0.12);
+}
+
+thead th {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(11, 31, 58, 0.72);
+}
+
+tbody tr:nth-child(even) {
+  background: #fbfcff;
 }
 
 td:last-child,
@@ -393,10 +425,10 @@ th:last-child {
 }
 
 .summary-card {
-  border: 1px solid rgba(20, 93, 116, 0.22);
+  border: 1px solid rgba(15, 39, 72, 0.16);
   border-radius: 14px;
-  padding: 0.8rem;
-  background: linear-gradient(130deg, #ffffff, var(--paper));
+  padding: 0.85rem;
+  background: linear-gradient(145deg, #ffffff 0%, #f7faff 100%);
 }
 
 .summary-card p {
@@ -424,7 +456,7 @@ th:last-child {
   grid-template-columns: auto 1fr auto;
   gap: 0.6rem;
   align-items: center;
-  border: 1px solid rgba(20, 93, 116, 0.2);
+  border: 1px solid rgba(15, 39, 72, 0.14);
   border-radius: 12px;
   background: #ffffff;
   padding: 0.55rem 0.7rem;
@@ -442,7 +474,7 @@ th:last-child {
 
 .leaderboard-meta {
   font-size: 0.82rem;
-  color: rgba(18, 38, 49, 0.68);
+  color: rgba(11, 31, 58, 0.7);
 }
 
 .xp-config-list {
@@ -455,7 +487,7 @@ th:last-child {
   grid-template-columns: 1fr 92px;
   gap: 0.6rem;
   align-items: center;
-  border: 1px solid rgba(20, 93, 116, 0.18);
+  border: 1px solid rgba(15, 39, 72, 0.16);
   border-radius: 10px;
   background: #ffffff;
   padding: 0.45rem 0.55rem;
@@ -471,13 +503,18 @@ th:last-child {
 
 .schedule-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
+}
+
+#savedTaskEmployees {
+  min-height: 10.5rem;
 }
 
 .celebration-modal {
   position: fixed;
   inset: 0;
-  background: rgba(18, 38, 49, 0.48);
+  background: rgba(9, 27, 56, 0.56);
   display: grid;
   place-items: center;
   padding: 1rem;
@@ -492,9 +529,9 @@ th:last-child {
   width: min(520px, 100%);
   border-radius: 18px;
   padding: 1.1rem;
-  background: linear-gradient(150deg, #ffffff 0%, #f4fbff 50%, #fff4e0 100%);
-  border: 1px solid rgba(20, 93, 116, 0.2);
-  box-shadow: 0 14px 40px rgba(17, 54, 76, 0.2);
+  background: linear-gradient(155deg, #ffffff 0%, #f4f8ff 60%, #fdeff2 100%);
+  border: 1px solid rgba(15, 39, 72, 0.16);
+  box-shadow: 0 14px 40px rgba(9, 27, 56, 0.22);
   animation: rise 180ms ease-out both;
 }
 
@@ -516,8 +553,8 @@ th:last-child {
   font-size: 0.78rem;
   font-weight: 600;
   letter-spacing: 0.04em;
-  border: 1px solid rgba(20, 93, 116, 0.3);
-  background: var(--ice-50);
+  border: 1px solid rgba(15, 39, 72, 0.26);
+  background: #eef3fb;
   color: var(--ice-700);
 }
 
@@ -544,7 +581,7 @@ th:last-child {
 }
 
 .unavail-dates-fieldset {
-  border: 1px solid rgba(20, 93, 116, 0.2);
+  border: 1px solid rgba(15, 39, 72, 0.18);
   border-radius: 12px;
   padding: 0.75rem 0.9rem 0.9rem;
   margin: 0;
@@ -568,7 +605,7 @@ th:last-child {
   text-align: center;
   font-size: 0.72rem;
   font-weight: 700;
-  color: rgba(18, 38, 49, 0.5);
+  color: rgba(11, 31, 58, 0.52);
   padding-bottom: 0.2rem;
 }
 
@@ -579,7 +616,7 @@ th:last-child {
 .cal-day {
   aspect-ratio: 1;
   border-radius: 8px;
-  border: 1px solid rgba(20, 93, 116, 0.18);
+  border: 1px solid rgba(15, 39, 72, 0.18);
   background: #fff;
   font-size: 0.82rem;
   font-weight: 500;
@@ -590,27 +627,27 @@ th:last-child {
 }
 
 .cal-day:hover {
-  background: var(--ice-100);
-  border-color: var(--ice-300);
+  background: #edf3ff;
+  border-color: #b9cae8;
   transform: none;
   filter: none;
 }
 
 .cal-day--selected {
-  background: var(--ice-700);
-  border-color: var(--ice-700);
+  background: #0f2748;
+  border-color: #0f2748;
   color: #ffffff;
 }
 
 .cal-day--selected:hover {
-  background: #0f4a5e;
-  border-color: #0f4a5e;
+  background: #0a1d38;
+  border-color: #0a1d38;
 }
 
 .cal-day--closed {
   background: transparent;
   border-color: transparent;
-  color: rgba(18, 38, 49, 0.22);
+  color: rgba(11, 31, 58, 0.25);
   cursor: default;
   pointer-events: none;
 }
@@ -623,11 +660,20 @@ th:last-child {
 
 .unavail-notes-label textarea {
   font: inherit;
-  border: 1px solid rgba(18, 38, 49, 0.25);
+  border: 1px solid rgba(15, 39, 72, 0.28);
   border-radius: 10px;
   padding: 0.6rem 0.7rem;
   background: #fff;
   resize: vertical;
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+button:focus-visible {
+  outline: 3px solid rgba(194, 31, 58, 0.26);
+  outline-offset: 1px;
+  border-color: #c21f3a;
 }
 
 .unavail-status-msg {
@@ -664,6 +710,16 @@ th:last-child {
   }
 }
 
+@media (max-width: 960px) {
+  .time-entry-row {
+    gap: 0.95rem;
+  }
+
+  .time-entry-row label {
+    min-width: 100%;
+  }
+}
+
 @media (max-width: 600px) {
   .hero,
   .layout {
@@ -682,5 +738,13 @@ th:last-child {
 
   .button-row button {
     flex: 1;
+  }
+
+  .time-entry-row label {
+    min-width: 100%;
+  }
+
+  #savedTaskEmployees {
+    min-height: 8rem;
   }
 }
