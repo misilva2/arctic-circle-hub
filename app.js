@@ -110,6 +110,12 @@ const refs = {
   adminSignInBtn: document.getElementById("adminSignInBtn"),
   adminSignOutBtn: document.getElementById("adminSignOutBtn"),
   adminStatus: document.getElementById("adminStatus"),
+  adminSettings: document.getElementById("adminSettings"),
+  settingsEmployeeList: document.getElementById("settingsEmployeeList"),
+  assignTaskForm: document.getElementById("assignTaskForm"),
+  assignTaskEmployee: document.getElementById("assignTaskEmployee"),
+  assignTaskText: document.getElementById("assignTaskText"),
+  assignTaskXp: document.getElementById("assignTaskXp"),
   taskEmployee: document.getElementById("taskEmployee"),
   taskPin: document.getElementById("taskPin"),
   taskSignInBtn: document.getElementById("taskSignInBtn"),
@@ -154,6 +160,7 @@ function bindEvents() {
   refs.addTimeForm.addEventListener("submit", addManualEntry);
   refs.scheduleForm.addEventListener("submit", addScheduleEntry);
   refs.xpConfigForm.addEventListener("submit", saveXpConfig);
+  refs.assignTaskForm.addEventListener("submit", addAssignedTask);
   refs.closeCelebrationBtn.addEventListener("click", closeCelebration);
   refs.adminSignInBtn.addEventListener("click", signInAdmin);
   refs.taskSignInBtn.addEventListener("click", signInTaskEmployee);
@@ -299,7 +306,9 @@ function toggleProcedure(procedureId) {
   if (nextDone) {
     procedure.completedAt = new Date().toISOString();
     if (!procedure.xpAwarded) {
-      const xp = getTaskXp(procedure.text);
+      const xp = Number.isFinite(Number(procedure.xpValue))
+        ? Number(procedure.xpValue)
+        : getTaskXp(procedure.text);
       awardXp(procedure.employeeId, xp, `Task completed: ${procedure.text}`);
       procedure.xpAwarded = true;
     }
@@ -335,7 +344,7 @@ function renderAll() {
   renderSummary();
   renderLeaderboard();
   renderSchedule();
-  renderXpConfig();
+  renderAdminSettings();
   updateLiveClockIns();
   renderTaskAccess();
   renderUnavailForm();
@@ -357,52 +366,10 @@ function renderEmployees() {
       adminBadge.textContent = "Admin";
       li.append(adminBadge);
     } else {
-      // Role change
-      const roleSelect = document.createElement("select");
-      roleSelect.className = "role-select";
-      roleSelect.setAttribute("aria-label", `Change role for ${employee.name}`);
-      for (const role of EDITABLE_ROLES) {
-        const option = document.createElement("option");
-        option.value = role;
-        option.textContent = role;
-        roleSelect.append(option);
-      }
-      roleSelect.value = employee.role;
-      roleSelect.disabled = !session.isAdminSignedIn;
-
-      const roleBtn = document.createElement("button");
-      roleBtn.type = "button";
-      roleBtn.className = "outline role-btn";
-      roleBtn.textContent = "Change Role";
-      roleBtn.disabled = !session.isAdminSignedIn;
-      roleBtn.addEventListener("click", () => {
-        changeEmployeeRole(employee.id, roleSelect.value);
-      });
-
-      if (session.isAdminSignedIn) {
-        // PIN values are only visible while admin is signed in.
-        const pinInput = document.createElement("input");
-        pinInput.type = "text";
-        pinInput.value = employee.pin;
-        pinInput.maxLength = 10;
-        pinInput.className = "pin-input";
-        pinInput.setAttribute("aria-label", `PIN for ${employee.name}`);
-
-        const pinBtn = document.createElement("button");
-        pinBtn.type = "button";
-        pinBtn.className = "outline role-btn";
-        pinBtn.textContent = "Change PIN";
-        pinBtn.addEventListener("click", () => {
-          changeEmployeePin(employee.id, pinInput.value);
-        });
-
-        li.append(roleSelect, roleBtn, pinInput, pinBtn);
-      } else {
-        const pinHiddenBadge = document.createElement("span");
-        pinHiddenBadge.className = "admin-badge";
-        pinHiddenBadge.textContent = "PIN hidden";
-        li.append(roleSelect, roleBtn, pinHiddenBadge);
-      }
+      const roleBadge = document.createElement("span");
+      roleBadge.className = "admin-badge";
+      roleBadge.textContent = employee.role;
+      li.append(roleBadge);
     }
 
     refs.employeeList.append(li);
@@ -413,6 +380,103 @@ function renderEmployees() {
     li.textContent = "No employees available.";
     refs.employeeList.append(li);
   }
+}
+
+function renderAdminSettings() {
+  refs.adminSettings.hidden = !session.isAdminSignedIn;
+
+  if (!session.isAdminSignedIn) {
+    return;
+  }
+
+  renderSettingsEmployeeOptions();
+  renderAssignTaskEmployeeOptions();
+  renderXpConfig();
+}
+
+function renderSettingsEmployeeOptions() {
+  refs.settingsEmployeeList.textContent = "";
+
+  for (const employee of state.employees) {
+    const li = document.createElement("li");
+    li.className = "employee-item";
+
+    const details = document.createElement("span");
+    details.textContent = `${employee.name} — ${employee.role}`;
+    li.append(details);
+
+    if (isAdmin(employee)) {
+      const adminBadge = document.createElement("span");
+      adminBadge.className = "admin-badge";
+      adminBadge.textContent = "Admin";
+      li.append(adminBadge);
+      refs.settingsEmployeeList.append(li);
+      continue;
+    }
+
+    const roleSelect = document.createElement("select");
+    roleSelect.className = "role-select";
+    roleSelect.setAttribute("aria-label", `Change role for ${employee.name}`);
+    for (const role of EDITABLE_ROLES) {
+      const option = document.createElement("option");
+      option.value = role;
+      option.textContent = role;
+      roleSelect.append(option);
+    }
+    roleSelect.value = employee.role;
+
+    const roleBtn = document.createElement("button");
+    roleBtn.type = "button";
+    roleBtn.className = "outline role-btn";
+    roleBtn.textContent = "Change Role";
+    roleBtn.addEventListener("click", () => {
+      changeEmployeeRole(employee.id, roleSelect.value);
+    });
+
+    const pinInput = document.createElement("input");
+    pinInput.type = "text";
+    pinInput.value = employee.pin;
+    pinInput.maxLength = 10;
+    pinInput.className = "pin-input";
+    pinInput.setAttribute("aria-label", `PIN for ${employee.name}`);
+
+    const pinBtn = document.createElement("button");
+    pinBtn.type = "button";
+    pinBtn.className = "outline role-btn";
+    pinBtn.textContent = "Change PIN";
+    pinBtn.addEventListener("click", () => {
+      changeEmployeePin(employee.id, pinInput.value);
+    });
+
+    li.append(roleSelect, roleBtn, pinInput, pinBtn);
+    refs.settingsEmployeeList.append(li);
+  }
+
+  if (state.employees.length === 0) {
+    const li = document.createElement("li");
+    li.textContent = "No employees available.";
+    refs.settingsEmployeeList.append(li);
+  }
+}
+
+function renderAssignTaskEmployeeOptions() {
+  const current = refs.assignTaskEmployee.value;
+  refs.assignTaskEmployee.textContent = "";
+
+  const emptyOption = document.createElement("option");
+  emptyOption.value = "";
+  emptyOption.textContent = "Select employee";
+  refs.assignTaskEmployee.append(emptyOption);
+
+  for (const employee of state.employees) {
+    const option = document.createElement("option");
+    option.value = employee.id;
+    option.textContent = employee.name;
+    refs.assignTaskEmployee.append(option);
+  }
+
+  const hasCurrent = state.employees.some((employee) => employee.id === current);
+  refs.assignTaskEmployee.value = hasCurrent ? current : "";
 }
 
 function renderClockEmployeeOptions() {
@@ -663,13 +727,31 @@ function renderProcedures() {
     const text = node.querySelector(".procedure-text");
     const removeBtn = node.querySelector("button");
     const assignee = state.employees.find((employee) => employee.id === procedure.employeeId);
+    const xpText = Number.isFinite(Number(procedure.xpValue))
+      ? ` (${Number(procedure.xpValue)} XP)`
+      : "";
     const assigneeText = assignee
-      ? `${assignee.name} (${assignee.role}) - ${procedure.text}`
-      : `${procedure.role} - ${procedure.text}`;
+      ? `${assignee.name} (${assignee.role}) - ${procedure.text}${xpText}`
+      : `${procedure.role} - ${procedure.text}${xpText}`;
 
     checkbox.checked = procedure.done;
     checkbox.disabled = !canUpdateProcedure(procedure);
-    removeBtn.style.display = "none";
+    removeBtn.style.display = session.isAdminSignedIn && procedure.custom ? "inline-flex" : "none";
+    removeBtn.textContent = "Remove";
+    if (session.isAdminSignedIn && procedure.custom) {
+      const editBtn = document.createElement("button");
+      editBtn.type = "button";
+      editBtn.className = "text-btn";
+      editBtn.textContent = "Edit";
+      editBtn.addEventListener("click", () => editProcedure(procedure.id));
+
+      const actionWrap = document.createElement("div");
+      actionWrap.className = "schedule-actions";
+      actionWrap.append(editBtn, removeBtn);
+      node.append(actionWrap);
+
+      removeBtn.addEventListener("click", () => removeProcedure(procedure.id));
+    }
     text.textContent = assigneeText;
     node.classList.toggle("done", procedure.done);
 
@@ -857,6 +939,96 @@ function addScheduleEntry(event) {
   });
 
   refs.scheduleForm.reset();
+  persistAndRender();
+}
+
+function addAssignedTask(event) {
+  event.preventDefault();
+  if (!session.isAdminSignedIn) {
+    return;
+  }
+
+  const employeeId = refs.assignTaskEmployee.value;
+  const text = refs.assignTaskText.value.trim();
+  const xpValue = Number(refs.assignTaskXp.value);
+
+  if (!employeeId || !text) {
+    window.alert("Employee and task text are required.");
+    return;
+  }
+
+  if (!Number.isFinite(xpValue) || xpValue <= 0) {
+    window.alert("XP must be greater than 0.");
+    return;
+  }
+
+  const employee = state.employees.find((item) => item.id === employeeId);
+  if (!employee) {
+    return;
+  }
+
+  state.procedures.push({
+    id: crypto.randomUUID(),
+    text,
+    done: false,
+    employeeId,
+    role: employee.role,
+    custom: true,
+    xpValue: Math.round(xpValue),
+    xpAwarded: false,
+    completedAt: null
+  });
+
+  refs.assignTaskForm.reset();
+  persistAndRender();
+}
+
+function removeProcedure(procedureId) {
+  if (!session.isAdminSignedIn) {
+    return;
+  }
+
+  state.procedures = state.procedures.filter((task) => task.id !== procedureId);
+  persistAndRender();
+}
+
+function editProcedure(procedureId) {
+  if (!session.isAdminSignedIn) {
+    return;
+  }
+
+  const procedure = state.procedures.find((item) => item.id === procedureId);
+  if (!procedure || !procedure.custom) {
+    return;
+  }
+
+  const nextTextInput = window.prompt("Update task text:", procedure.text);
+  if (nextTextInput === null) {
+    return;
+  }
+
+  const nextText = nextTextInput.trim();
+  if (!nextText) {
+    window.alert("Task text cannot be empty.");
+    return;
+  }
+
+  const currentXp = Number.isFinite(Number(procedure.xpValue))
+    ? Math.round(Number(procedure.xpValue))
+    : getTaskXp(procedure.text);
+  const nextXpInput = window.prompt("Update XP value:", String(currentXp));
+  if (nextXpInput === null) {
+    return;
+  }
+
+  const nextXpValue = Number(nextXpInput);
+  if (!Number.isFinite(nextXpValue) || nextXpValue <= 0) {
+    window.alert("XP must be greater than 0.");
+    return;
+  }
+
+  procedure.text = nextText;
+  procedure.xpValue = Math.round(nextXpValue);
   persistAndRender();
 }
 
@@ -1207,11 +1379,11 @@ function changeEmployeeRole(employeeId, nextRole) {
 
 function reassignEmployeeRoleTasks(employeeId, nextRole) {
   const existingGeneratedTasks = state.procedures.filter(
-    (task) => task.employeeId === employeeId
+    (task) => task.employeeId === employeeId && !task.custom
   );
   const doneByText = new Map(existingGeneratedTasks.map((task) => [task.text, task.done]));
 
-  state.procedures = state.procedures.filter((task) => task.employeeId !== employeeId);
+  state.procedures = state.procedures.filter((task) => task.employeeId !== employeeId || task.custom);
 
   const nextTasks = getTasksForRole(nextRole).map((text) => ({
     id: crypto.randomUUID(),
@@ -1220,6 +1392,7 @@ function reassignEmployeeRoleTasks(employeeId, nextRole) {
     employeeId,
     role: nextRole,
     custom: false,
+    xpValue: null,
     xpAwarded: false,
     completedAt: null
   }));
@@ -1308,6 +1481,8 @@ function createRoleBasedTasks(employees, existingProcedures = []) {
     done: Boolean(task.done),
     employeeId: task.employeeId,
     role: task.role,
+    custom: Boolean(task.custom),
+    xpValue: Number.isFinite(Number(task.xpValue)) ? Math.round(Number(task.xpValue)) : null,
     xpAwarded: Boolean(task.xpAwarded),
     completedAt: task.completedAt ?? null
   }));
@@ -1318,7 +1493,11 @@ function createRoleBasedTasks(employees, existingProcedures = []) {
     const employeeExisting = normalizedExisting.filter(
       (task) => task.employeeId === employee.id
     );
-    const generatedByText = new Map(employeeExisting.map((task) => [task.text, task]));
+    const generatedByText = new Map(
+      employeeExisting
+        .filter((task) => !task.custom)
+        .map((task) => [task.text, task])
+    );
 
     for (const text of getTasksForRole(employee.role)) {
       const existing = generatedByText.get(text);
@@ -1329,8 +1508,23 @@ function createRoleBasedTasks(employees, existingProcedures = []) {
         employeeId: employee.id,
         role: employee.role,
         custom: false,
+        xpValue: null,
         xpAwarded: existing?.xpAwarded ?? false,
         completedAt: existing?.completedAt ?? null
+      });
+    }
+
+    for (const customTask of employeeExisting.filter((task) => task.custom)) {
+      tasks.push({
+        id: customTask.id ?? crypto.randomUUID(),
+        text: customTask.text,
+        done: customTask.done,
+        employeeId: employee.id,
+        role: employee.role,
+        custom: true,
+        xpValue: customTask.xpValue,
+        xpAwarded: customTask.xpAwarded,
+        completedAt: customTask.completedAt
       });
     }
   }

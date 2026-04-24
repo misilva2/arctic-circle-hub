@@ -122,7 +122,8 @@
           <h2>Role-Based Task Checklist</h2>
         </div>
         <p class="panel-note">
-          Tasks are assigned automatically by role. Sign in as admin to update task completion.
+          Tasks are assigned by role, and admins can assign extra tasks in Settings.
+          Employees can only update their own tasks after PIN sign-in.
         </p>
         <div>
           <div id="adminAuth" class="admin-auth">
@@ -181,14 +182,51 @@
         <ol id="leaderboardList" class="leaderboard-list"></ol>
         <h3 class="admin-subhead">Weekly Winners Archive</h3>
         <ul id="weeklyWinnersList" class="chip-list"></ul>
-        <div id="adminXpConfig" hidden>
-          <form id="xpConfigForm" class="form-grid admin-time-entry">
-            <h3 class="admin-subhead">XP Configuration</h3>
-            <div id="xpConfigList" class="xp-config-list"></div>
-            <div class="button-row align-end">
-              <button type="submit">Save XP Values</button>
+      </section>
+
+      <section class="panel panel--wide">
+        <div class="panel__head">
+          <h2>Admin Settings</h2>
+        </div>
+        <p class="panel-note">
+          Manage employee roles, PINs, assigned tasks, and XP settings.
+        </p>
+        <div id="adminSettings" hidden>
+          <form id="assignTaskForm" class="form-grid admin-time-entry">
+            <h3 class="admin-subhead">Assign Task</h3>
+            <div class="time-entry-row">
+              <label>
+                Employee
+                <select id="assignTaskEmployee" required></select>
+              </label>
+              <label>
+                Task
+                <input type="text" id="assignTaskText" maxlength="120" placeholder="e.g. Deep-clean prep fridge" required />
+              </label>
+              <label>
+                XP Value
+                <input type="number" id="assignTaskXp" min="1" step="1" value="20" required />
+              </label>
+              <div class="button-row align-end">
+                <button type="submit">Assign Task</button>
+              </div>
             </div>
           </form>
+
+          <div class="admin-time-entry">
+            <h3 class="admin-subhead">Employee Roles and PINs</h3>
+            <ul id="settingsEmployeeList" class="chip-list"></ul>
+          </div>
+
+          <div id="adminXpConfig">
+            <form id="xpConfigForm" class="form-grid admin-time-entry">
+              <h3 class="admin-subhead">XP Configuration</h3>
+              <div id="xpConfigList" class="xp-config-list"></div>
+              <div class="button-row align-end">
+                <button type="submit">Save XP Values</button>
+              </div>
+            </form>
+          </div>
         </div>
       </section>
 
