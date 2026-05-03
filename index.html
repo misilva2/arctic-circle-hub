@@ -174,6 +174,41 @@
 
       <section class="panel panel--wide">
         <div class="panel__head">
+          <h2>Daily Card Tips</h2>
+        </div>
+        <p class="panel-note">
+          Admin enters each day&apos;s card tips and chooses who worked that day.
+          The app splits the total evenly, and admin can update any day later.
+        </p>
+        <div id="adminTipForm" hidden>
+          <form id="tipForm" class="form-grid admin-time-entry">
+            <h3 class="admin-subhead">Add or Update Daily Tip</h3>
+            <div class="time-entry-row">
+              <label>
+                Date
+                <input type="date" id="tipDate" required />
+              </label>
+              <label>
+                Total Card Tips ($)
+                <input type="number" id="tipTotal" min="0" step="0.01" placeholder="0.00" required />
+              </label>
+              <label>
+                Worked That Day
+                <select id="tipEmployees" multiple size="5" required></select>
+              </label>
+              <div class="button-row align-end">
+                <button type="submit">Save Daily Tip</button>
+                <button type="button" id="clearTipFormBtn" class="outline">Clear</button>
+              </div>
+            </div>
+            <p class="panel-note">Tip is split evenly across selected employees.</p>
+          </form>
+        </div>
+        <ul id="tipList" class="chip-list"></ul>
+      </section>
+
+      <section class="panel panel--wide">
+        <div class="panel__head">
           <h2>XP Leaderboard</h2>
         </div>
         <p class="panel-note">

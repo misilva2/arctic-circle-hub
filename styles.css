@@ -17,6 +17,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 body {
   margin: 0;
   font-family: "Space Grotesk", sans-serif;
@@ -507,7 +511,22 @@ th:last-child {
   gap: 0.5rem;
 }
 
+.tip-detail {
+  display: grid;
+  gap: 0.2rem;
+  margin-right: auto;
+}
+
+.tip-meta {
+  font-size: 0.84rem;
+  color: rgba(11, 31, 58, 0.76);
+}
+
 #savedTaskEmployees {
+  min-height: 10.5rem;
+}
+
+#tipEmployees {
   min-height: 10.5rem;
 }
 
@@ -745,6 +764,10 @@ button:focus-visible {
   }
 
   #savedTaskEmployees {
+    min-height: 8rem;
+  }
+
+  #tipEmployees {
     min-height: 8rem;
   }
 }

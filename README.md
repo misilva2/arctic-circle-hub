@@ -18,6 +18,8 @@ Employee time tracking and role-based task management web app.
 - Off role removes all task assignments for that employee
 - Inventory reminder included for all positions
 - Hours summary by employee
+- Daily card-tip tracking by date with per-worker split
+- Admin-only controls to add and adjust daily tip payouts
 - CSV export for timesheet entries
 - Local persistence using browser `localStorage`
 

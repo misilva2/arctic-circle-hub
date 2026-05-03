@@ -98,6 +98,13 @@ const refs = {
   clockOutBtn: document.getElementById("clockOutBtn"),
   entryTableBody: document.getElementById("entryTableBody"),
   summaryCards: document.getElementById("summaryCards"),
+  adminTipForm: document.getElementById("adminTipForm"),
+  tipForm: document.getElementById("tipForm"),
+  tipDate: document.getElementById("tipDate"),
+  tipTotal: document.getElementById("tipTotal"),
+  tipEmployees: document.getElementById("tipEmployees"),
+  clearTipFormBtn: document.getElementById("clearTipFormBtn"),
+  tipList: document.getElementById("tipList"),
   procedureList: document.getElementById("procedureList"),
   procedureTemplate: document.getElementById("procedureTemplate"),
   exportCsvBtn: document.getElementById("exportCsvBtn"),
@@ -177,6 +184,8 @@ function bindEvents() {
   refs.taskSignOutBtn.addEventListener("click", signOutTaskEmployee);
   refs.unavailForm.addEventListener("submit", submitUnavailability);
   refs.adminSignOutBtn.addEventListener("click", signOutAdmin);
+  refs.tipForm.addEventListener("submit", saveDailyTip);
+  refs.clearTipFormBtn.addEventListener("click", clearDailyTipForm);
 }
 
 function signInAdmin() {
@@ -352,12 +361,224 @@ function renderAll() {
   renderEntries();
   renderProcedures();
   renderSummary();
+  renderDailyTips();
   renderLeaderboard();
   renderSchedule();
   renderAdminSettings();
   updateLiveClockIns();
   renderTaskAccess();
   renderUnavailForm();
+}
+
+function renderDailyTips() {
+  refs.adminTipForm.hidden = !session.isAdminSignedIn;
+
+  if (session.isAdminSignedIn) {
+    renderTipEmployeeOptions();
+    if (!refs.tipDate.value) {
+      refs.tipDate.value = toDateInputValue(new Date());
+    }
+  }
+
+  refs.tipList.textContent = "";
+
+  if (state.dailyTips.length === 0) {
+    const li = document.createElement("li");
+    li.textContent = "No daily card tips recorded yet.";
+    refs.tipList.append(li);
+    return;
+  }
+
+  const sortedTips = [...state.dailyTips].sort((a, b) => b.date.localeCompare(a.date));
+  for (const tip of sortedTips) {
+    refs.tipList.append(buildDailyTipRow(tip));
+  }
+}
+
+function renderTipEmployeeOptions() {
+  const selected = new Set(Array.from(refs.tipEmployees.selectedOptions).map((opt) => opt.value));
+  refs.tipEmployees.textContent = "";
+
+  for (const employee of state.employees) {
+    const option = document.createElement("option");
+    option.value = employee.id;
+    option.textContent = `${employee.name} (${employee.role})`;
+    option.selected = selected.has(employee.id);
+    refs.tipEmployees.append(option);
+  }
+}
+
+function buildDailyTipRow(tip) {
+  const li = document.createElement("li");
+
+  const detailWrap = document.createElement("div");
+  detailWrap.className = "tip-detail";
+
+  const heading = document.createElement("strong");
+  heading.textContent = `${formatDateLabel(tip.date)} | Total ${formatCurrency(tip.totalCents / 100)}`;
+  detailWrap.append(heading);
+
+  const employeesForTip = tip.employeeIds
+    .map((employeeId) => state.employees.find((employee) => employee.id === employeeId))
+    .filter(Boolean);
+
+  const split = splitTipCents(tip.totalCents, employeesForTip.length);
+  const splitParts = employeesForTip.map((employee, index) => {
+    return `${employee.name}: ${formatCurrency((split[index] ?? 0) / 100)}`;
+  });
+
+  const meta = document.createElement("div");
+  meta.className = "tip-meta";
+  meta.textContent = splitParts.length
+    ? `Split across ${splitParts.length} employee(s): ${splitParts.join(" | ")}`
+    : "No employees assigned for this tip day.";
+  detailWrap.append(meta);
+
+  li.append(detailWrap);
+
+  if (session.isAdminSignedIn) {
+    const actions = document.createElement("div");
+    actions.className = "schedule-actions";
+
+    const editBtn = document.createElement("button");
+    editBtn.type = "button";
+    editBtn.className = "outline role-btn";
+    editBtn.textContent = "Edit";
+    editBtn.addEventListener("click", () => editDailyTip(tip.date));
+
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "outline role-btn";
+    removeBtn.textContent = "Remove";
+    removeBtn.addEventListener("click", () => removeDailyTip(tip.date));
+
+    actions.append(editBtn, removeBtn);
+    li.append(actions);
+  }
+
+  return li;
+}
+
+function splitTipCents(totalCents, participantCount) {
+  if (!participantCount || participantCount <= 0) {
+    return [];
+  }
+
+  const base = Math.floor(totalCents / participantCount);
+  let remainder = totalCents % participantCount;
+  const values = [];
+
+  for (let index = 0; index < participantCount; index += 1) {
+    const extra = remainder > 0 ? 1 : 0;
+    values.push(base + extra);
+    remainder = Math.max(remainder - 1, 0);
+  }
+
+  return values;
+}
+
+function saveDailyTip(event) {
+  event.preventDefault();
+  if (!session.isAdminSignedIn) {
+    return;
+  }
+
+  const date = refs.tipDate.value;
+  const total = Number(refs.tipTotal.value);
+  const employeeIds = Array.from(refs.tipEmployees.selectedOptions).map((opt) => opt.value);
+
+  if (!date) {
+    window.alert("Tip date is required.");
+    return;
+  }
+
+  if (!Number.isFinite(total) || total < 0) {
+    window.alert("Total tip amount must be 0 or greater.");
+    return;
+  }
+
+  if (employeeIds.length === 0) {
+    window.alert("Select at least one employee who worked that day.");
+    return;
+  }
+
+  const totalCents = Math.round(total * 100);
+  const uniqueEmployeeIds = Array.from(new Set(employeeIds));
+  const existing = state.dailyTips.find((item) => item.date === date);
+
+  if (existing) {
+    existing.totalCents = totalCents;
+    existing.employeeIds = uniqueEmployeeIds;
+    existing.updatedAt = new Date().toISOString();
+  } else {
+    state.dailyTips.push({
+      id: crypto.randomUUID(),
+      date,
+      totalCents,
+      employeeIds: uniqueEmployeeIds,
+      updatedAt: new Date().toISOString()
+    });
+  }
+
+  clearDailyTipForm();
+  refs.tipDate.value = date;
+  persistAndRender();
+}
+
+function clearDailyTipForm() {
+  refs.tipForm.reset();
+  refs.tipDate.value = toDateInputValue(new Date());
+  for (const option of refs.tipEmployees.options) {
+    option.selected = false;
+  }
+}
+
+function editDailyTip(date) {
+  if (!session.isAdminSignedIn) {
+    return;
+  }
+
+  const tip = state.dailyTips.find((item) => item.date === date);
+  if (!tip) {
+    return;
+  }
+
+  refs.tipDate.value = tip.date;
+  refs.tipTotal.value = (tip.totalCents / 100).toFixed(2);
+
+  const selected = new Set(tip.employeeIds);
+  for (const option of refs.tipEmployees.options) {
+    option.selected = selected.has(option.value);
+  }
+}
+
+function removeDailyTip(date) {
+  if (!session.isAdminSignedIn) {
+    return;
+  }
+
+  state.dailyTips = state.dailyTips.filter((item) => item.date !== date);
+  persistAndRender();
+}
+
+function toDateInputValue(date) {
+  return new Date(date).toISOString().slice(0, 10);
+}
+
+function formatDateLabel(value) {
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric"
+  }).format(new Date(`${value}T12:00:00`));
+}
+
+function formatCurrency(amount) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD"
+  }).format(amount);
 }
 
 function renderEmployees() {
@@ -1563,6 +1784,7 @@ function loadState() {
       archivedEntries: Array.isArray(parsed.archivedEntries) ? parsed.archivedEntries : [],
       procedures: createRoleBasedTasks(employees, parsedProcedures),
       savedTasks: normalizeSavedTasks(parsedSavedTasks, parsedProcedures),
+      dailyTips: normalizeDailyTips(parsed.dailyTips, employees),
       schedule: Array.isArray(parsed.schedule) ? parsed.schedule : [],
       xpEvents: Array.isArray(parsed.xpEvents) ? parsed.xpEvents : [],
       lastCelebrationWeekKey: parsed.lastCelebrationWeekKey ?? null,
@@ -1649,12 +1871,43 @@ function createDefaultState() {
     archivedEntries: [],
     procedures: [],
     savedTasks: [],
+    dailyTips: [],
     schedule: [],
     xpEvents: [],
     lastCelebrationWeekKey: null,
     weeklyWinners: [],
     xpConfig: { ...DEFAULT_TASK_XP_BY_TEXT }
   };
+}
+
+function normalizeDailyTips(dailyTips = [], employees = []) {
+  if (!Array.isArray(dailyTips)) {
+    return [];
+  }
+
+  const validEmployeeIds = new Set(employees.map((employee) => employee.id));
+  return dailyTips
+    .map((tip) => {
+      if (typeof tip?.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(tip.date)) {
+        return null;
+      }
+
+      const cents = Number(tip.totalCents);
+      const totalCents = Number.isFinite(cents) && cents >= 0 ? Math.round(cents) : 0;
+      const employeeIds = Array.isArray(tip.employeeIds)
+        ? Array.from(new Set(tip.employeeIds.filter((id) => validEmployeeIds.has(id))))
+        : [];
+
+      return {
+        id: typeof tip.id === "string" ? tip.id : crypto.randomUUID(),
+        date: tip.date,
+        totalCents,
+        employeeIds,
+        updatedAt: typeof tip.updatedAt === "string" ? tip.updatedAt : null
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.date.localeCompare(a.date));
 }
 
 function normalizeXpConfig(config) {
@@ -2041,6 +2294,7 @@ function applyCloudState(parsed) {
   state.archivedEntries = Array.isArray(parsed.archivedEntries) ? parsed.archivedEntries : [];
   state.procedures = createRoleBasedTasks(employees, parsedProcedures);
   state.savedTasks = normalizeSavedTasks(parsedSavedTasks, parsedProcedures);
+  state.dailyTips = normalizeDailyTips(parsed.dailyTips, employees);
   state.schedule = Array.isArray(parsed.schedule) ? parsed.schedule : [];
   state.xpEvents = Array.isArray(parsed.xpEvents) ? parsed.xpEvents : [];
   state.lastCelebrationWeekKey = parsed.lastCelebrationWeekKey ?? null;
