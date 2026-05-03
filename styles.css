@@ -526,8 +526,36 @@ th:last-child {
   min-height: 10.5rem;
 }
 
-#tipEmployees {
+.tip-employee-grid {
   min-height: 10.5rem;
+  max-height: 14rem;
+  overflow: auto;
+  border: 1px solid rgba(15, 39, 72, 0.28);
+  border-radius: 11px;
+  padding: 0.45rem;
+  display: grid;
+  gap: 0.35rem;
+  background: #ffffff;
+}
+
+.tip-employee-option {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.42rem 0.48rem;
+  border: 1px solid rgba(15, 39, 72, 0.12);
+  border-radius: 9px;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.tip-employee-option input[type="checkbox"] {
+  accent-color: #c21f3a;
+}
+
+.tip-employee-option:has(input:checked) {
+  border-color: rgba(194, 31, 58, 0.45);
+  background: #fdf1f4;
 }
 
 .celebration-modal {

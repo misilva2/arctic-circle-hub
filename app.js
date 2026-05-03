@@ -396,15 +396,37 @@ function renderDailyTips() {
 }
 
 function renderTipEmployeeOptions() {
-  const selected = new Set(Array.from(refs.tipEmployees.selectedOptions).map((opt) => opt.value));
+  const selected = new Set(getSelectedTipEmployeeIds());
   refs.tipEmployees.textContent = "";
 
   for (const employee of state.employees) {
-    const option = document.createElement("option");
-    option.value = employee.id;
-    option.textContent = `${employee.name} (${employee.role})`;
-    option.selected = selected.has(employee.id);
-    refs.tipEmployees.append(option);
+    const optionLabel = document.createElement("label");
+    optionLabel.className = "tip-employee-option";
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.value = employee.id;
+    checkbox.checked = selected.has(employee.id);
+
+    const text = document.createElement("span");
+    text.textContent = `${employee.name} (${employee.role})`;
+
+    optionLabel.append(checkbox, text);
+    refs.tipEmployees.append(optionLabel);
+  }
+}
+
+function getSelectedTipEmployeeIds() {
+  return Array.from(
+    refs.tipEmployees.querySelectorAll('input[type="checkbox"]:checked'),
+    (input) => input.value
+  );
+}
+
+function setSelectedTipEmployeeIds(employeeIds) {
+  const selected = new Set(employeeIds);
+  for (const input of refs.tipEmployees.querySelectorAll('input[type="checkbox"]')) {
+    input.checked = selected.has(input.value);
   }
 }
 
@@ -485,7 +507,7 @@ function saveDailyTip(event) {
 
   const date = refs.tipDate.value;
   const total = Number(refs.tipTotal.value);
-  const employeeIds = Array.from(refs.tipEmployees.selectedOptions).map((opt) => opt.value);
+  const employeeIds = getSelectedTipEmployeeIds();
 
   if (!date) {
     window.alert("Tip date is required.");
@@ -528,9 +550,7 @@ function saveDailyTip(event) {
 function clearDailyTipForm() {
   refs.tipForm.reset();
   refs.tipDate.value = toDateInputValue(new Date());
-  for (const option of refs.tipEmployees.options) {
-    option.selected = false;
-  }
+  setSelectedTipEmployeeIds([]);
 }
 
 function editDailyTip(date) {
@@ -545,11 +565,7 @@ function editDailyTip(date) {
 
   refs.tipDate.value = tip.date;
   refs.tipTotal.value = (tip.totalCents / 100).toFixed(2);
-
-  const selected = new Set(tip.employeeIds);
-  for (const option of refs.tipEmployees.options) {
-    option.selected = selected.has(option.value);
-  }
+  setSelectedTipEmployeeIds(tip.employeeIds);
 }
 
 function removeDailyTip(date) {
@@ -1716,6 +1732,31 @@ function formatDateTime(value) {
   }).format(new Date(value));
 }
 
+function getLocalDateKey(value) {
+  const date = new Date(value);
+  const year = String(date.getFullYear());
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function buildDailyTipShareMap() {
+  const shareMap = new Map();
+
+  for (const tip of state.dailyTips) {
+    const employeeIds = Array.isArray(tip.employeeIds) ? tip.employeeIds : [];
+    const split = splitTipCents(Number(tip.totalCents) || 0, employeeIds.length);
+
+    employeeIds.forEach((employeeId, index) => {
+      const key = `${employeeId}|${tip.date}`;
+      const nextValue = (shareMap.get(key) || 0) + (split[index] || 0);
+      shareMap.set(key, nextValue);
+    });
+  }
+
+  return shareMap;
+}
+
 function exportCsv() {
   const currentWeekStart = getWeekStart(new Date());
   const currentWeekEnd = new Date(currentWeekStart);
@@ -1727,7 +1768,8 @@ function exportCsv() {
     return clockInDate >= currentWeekStart && clockInDate < currentWeekEnd;
   });
 
-  const rows = [["Employee", "Role", "Clock In", "Clock Out", "Total Hours"]];
+  const dailyTipShareMap = buildDailyTipShareMap();
+  const rows = [["Employee", "Role", "Clock In", "Clock Out", "Total Hours", "Daily Card Tip"]];
 
   for (const entry of currentWeekEntries) {
     const employee = state.employees.find((item) => item.id === entry.employeeId);
@@ -1735,12 +1777,16 @@ function exportCsv() {
       continue;
     }
 
+    const entryDate = getLocalDateKey(entry.clockIn);
+    const tipCents = dailyTipShareMap.get(`${entry.employeeId}|${entryDate}`) || 0;
+
     rows.push([
       employee.name,
       employee.role,
       formatDateTime(entry.clockIn),
       entry.clockOut ? formatDateTime(entry.clockOut) : "Open",
-      entry.clockOut ? calcDurationHours(entry.clockIn, entry.clockOut).toFixed(2) : ""
+      entry.clockOut ? calcDurationHours(entry.clockIn, entry.clockOut).toFixed(2) : "",
+      formatCurrency(tipCents / 100)
     ]);
   }
 

@@ -194,14 +194,14 @@
               </label>
               <label>
                 Worked That Day
-                <select id="tipEmployees" multiple size="5" required></select>
+                <div id="tipEmployees" class="tip-employee-grid" role="group" aria-label="Worked That Day"></div>
               </label>
               <div class="button-row align-end">
                 <button type="submit">Save Daily Tip</button>
                 <button type="button" id="clearTipFormBtn" class="outline">Clear</button>
               </div>
             </div>
-            <p class="panel-note">Tip is split evenly across selected employees.</p>
+            <p class="panel-note">Tip is split evenly across selected employees. Select any names that worked, even if they are not next to each other.</p>
           </form>
         </div>
         <ul id="tipList" class="chip-list"></ul>
