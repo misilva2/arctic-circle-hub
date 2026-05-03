@@ -155,6 +155,7 @@ const refs = {
 const syncStatusEl = document.getElementById("syncStatus");
 
 bindEvents();
+archiveOldEntries();
 renderAll();
 initFirebase();
 
@@ -634,14 +635,24 @@ function changeEmployeePin(employeeId, newPin) {
 function renderEntries() {
   refs.entryTableBody.textContent = "";
 
-  if (state.entries.length === 0) {
+  const currentWeekStart = getWeekStart(new Date());
+  const currentWeekEnd = new Date(currentWeekStart);
+  currentWeekEnd.setDate(currentWeekEnd.getDate() + 7);
+
+  // Filter entries to only show current week
+  const currentWeekEntries = state.entries.filter((entry) => {
+    const clockInDate = new Date(entry.clockIn);
+    return clockInDate >= currentWeekStart && clockInDate < currentWeekEnd;
+  });
+
+  if (currentWeekEntries.length === 0) {
     const row = document.createElement("tr");
-    row.innerHTML = '<td colspan="6">No time entries yet.</td>';
+    row.innerHTML = '<td colspan="6">No time entries for this week.</td>';
     refs.entryTableBody.append(row);
     return;
   }
 
-  const sortedEntries = [...state.entries].sort(
+  const sortedEntries = [...currentWeekEntries].sort(
     (a, b) => new Date(b.clockIn) - new Date(a.clockIn)
   );
 
@@ -1485,9 +1496,19 @@ function formatDateTime(value) {
 }
 
 function exportCsv() {
+  const currentWeekStart = getWeekStart(new Date());
+  const currentWeekEnd = new Date(currentWeekStart);
+  currentWeekEnd.setDate(currentWeekEnd.getDate() + 7);
+
+  // Export only current week entries
+  const currentWeekEntries = state.entries.filter((entry) => {
+    const clockInDate = new Date(entry.clockIn);
+    return clockInDate >= currentWeekStart && clockInDate < currentWeekEnd;
+  });
+
   const rows = [["Employee", "Role", "Clock In", "Clock Out", "Total Hours"]];
 
-  for (const entry of state.entries) {
+  for (const entry of currentWeekEntries) {
     const employee = state.employees.find((item) => item.id === entry.employeeId);
     if (!employee) {
       continue;
@@ -1539,6 +1560,7 @@ function loadState() {
     return {
       employees,
       entries: Array.isArray(parsed.entries) ? parsed.entries : [],
+      archivedEntries: Array.isArray(parsed.archivedEntries) ? parsed.archivedEntries : [],
       procedures: createRoleBasedTasks(employees, parsedProcedures),
       savedTasks: normalizeSavedTasks(parsedSavedTasks, parsedProcedures),
       schedule: Array.isArray(parsed.schedule) ? parsed.schedule : [],
@@ -1553,6 +1575,7 @@ function loadState() {
 }
 
 function persistAndRender() {
+  archiveOldEntries();
   const payload = { ...state, taskSchemaVersion: TASK_SCHEMA_VERSION };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
 
@@ -1561,6 +1584,22 @@ function persistAndRender() {
   }
 
   renderAll();
+}
+
+function archiveOldEntries() {
+  const currentWeekStart = getWeekStart(new Date());
+  const entriesToArchive = state.entries.filter((entry) => {
+    const clockInDate = new Date(entry.clockIn);
+    return clockInDate < currentWeekStart;
+  });
+
+  if (entriesToArchive.length > 0) {
+    state.archivedEntries.push(...entriesToArchive);
+    state.entries = state.entries.filter((entry) => {
+      const clockInDate = new Date(entry.clockIn);
+      return clockInDate >= currentWeekStart;
+    });
+  }
 }
 
 function changeEmployeeRole(employeeId, nextRole) {
@@ -1607,6 +1646,7 @@ function createDefaultState() {
   return {
     employees,
     entries: [],
+    archivedEntries: [],
     procedures: [],
     savedTasks: [],
     schedule: [],
@@ -1998,6 +2038,7 @@ function applyCloudState(parsed) {
 
   state.employees = employees;
   state.entries = Array.isArray(parsed.entries) ? parsed.entries : [];
+  state.archivedEntries = Array.isArray(parsed.archivedEntries) ? parsed.archivedEntries : [];
   state.procedures = createRoleBasedTasks(employees, parsedProcedures);
   state.savedTasks = normalizeSavedTasks(parsedSavedTasks, parsedProcedures);
   state.schedule = Array.isArray(parsed.schedule) ? parsed.schedule : [];
