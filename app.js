@@ -32,7 +32,8 @@ const ROSTER = [
   { name: "Krysta Rodriguez", role: "Chef" },
   { name: "Max Hawthrone", role: "Service" },
   { name: "Landyn Silva", role: "Service" },
-  { name: "Olivia Garcia", role: "Service" }
+  { name: "Olivia Garcia", role: "Service" },
+  { name: "Vivianna Bustamante", role: "Service" }
 ];
 
 const ADMIN_NAME = "Michaela Silva";
